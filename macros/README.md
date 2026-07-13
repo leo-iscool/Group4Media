@@ -1,4 +1,4 @@
-# Macro Tracker
+# Food Tracker
 
 A mobile-first PWA: photograph any food, Claude's vision API estimates its macros
 (calories, protein, carbs, fat), and the app tracks your intake against daily goals —
@@ -21,15 +21,17 @@ all stored on your device.
 
 ## Setup
 
-1. **Serve the site** (any static server works):
+1. **Host it** (camera access and service workers require HTTPS or `localhost`):
 
-   ```sh
-   npx serve -p 3456 .        # from the repo root, then open /macros/
-   ```
+   - **Cloudflare Pages / Netlify / Vercel** (free, works with this private repo):
+     connect the repo, no build command, output directory `/`. Every push auto-deploys.
+   - **GitHub Pages** (needs a public repo or GitHub Pro): Settings → Pages →
+     deploy from `main`, root folder.
+   - **Locally** for development:
 
-   Or enable GitHub Pages on this repo and open `https://<user>.github.io/Group4Media/macros/`.
-
-   > Note: camera access and service workers require HTTPS or `localhost`.
+     ```sh
+     npx serve .
+     ```
 
 2. **Get an Anthropic API key** at [console.anthropic.com](https://console.anthropic.com)
    and paste it into the app's **Settings** tab. It's stored only on your device.
