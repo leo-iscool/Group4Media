@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#101418">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Macro Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <main id="main">
+
+    <!-- ============ TODAY VIEW ============ -->
+    <section id="view-today" class="view">
+      <header class="view-header">
+        <div>
+          <h1>Today</h1>
+          <p id="today-date" class="subtitle"></p>
+        </div>
+        <div id="streak-badge" class="streak-badge hidden">🔥 <span id="streak-count">0</span></div>
+      </header>
+
+      <div class="card remaining-card">
+        <p id="remaining-headline" class="remaining-headline">— kcal left</p>
+        <p id="remaining-sub" class="subtitle"></p>
+      </div>
+
+      <div class="card">
+        <div class="macro-row" data-macro="calories">
+          <div class="macro-label"><span>Calories</span><span id="cal-nums" class="macro-nums">0 / 0</span></div>
+          <div class="bar"><div id="cal-bar" class="bar-fill"></div></div>
+        </div>
+        <div class="macro-row" data-macro="protein">
+          <div class="macro-label"><span>Protein</span><span id="pro-nums" class="macro-nums">0 / 0 g</span></div>
+          <div class="bar"><div id="pro-bar" class="bar-fill protein"></div></div>
+        </div>
+        <div class="macro-row" data-macro="carbs">
+          <div class="macro-label"><span>Carbs</span><span id="carb-nums" class="macro-nums">0 / 0 g</span></div>
+          <div class="bar"><div id="carb-bar" class="bar-fill carbs"></div></div>
+        </div>
+        <div class="macro-row" data-macro="fat">
+          <div class="macro-label"><span>Fat</span><span id="fat-nums" class="macro-nums">0 / 0 g</span></div>
+          <div class="bar"><div id="fat-bar" class="bar-fill fat"></div></div>
+        </div>
+      </div>
+
+      <div id="recents-section" class="hidden">
+        <h2 class="section-title">Recent foods</h2>
+        <div id="recents-row" class="recents-row"></div>
+      </div>
+
+      <h2 class="section-title">Logged today</h2>
+      <ul id="today-entries" class="entry-list"></ul>
+      <p id="today-empty" class="empty-note">Nothing logged yet. Snap a photo of your food to get started.</p>
+    </section>
+
+    <!-- ============ HISTORY VIEW ============ -->
+    <section id="view-history" class="view hidden">
+      <header class="view-header"><h1>History</h1></header>
+
+      <div class="card">
+        <h2 class="section-title chart-title">Last 7 days · calories</h2>
+        <div id="week-chart" class="week-chart"></div>
+        <div class="week-stats">
+          <div><span id="avg-cal" class="stat-num">–</span><span class="stat-label">avg kcal</span></div>
+          <div><span id="avg-pro" class="stat-num">–</span><span class="stat-label">avg protein</span></div>
+          <div><span id="hit-rate" class="stat-num">–</span><span class="stat-label">goals hit</span></div>
+        </div>
+      </div>
+
+      <ul id="history-days" class="history-list"></ul>
+      <p id="history-empty" class="empty-note">No past days yet.</p>
+    </section>
+
+    <!-- ============ SETTINGS VIEW ============ -->
+    <section id="view-settings" class="view hidden">
+      <header class="view-header"><h1>Settings</h1></header>
+
+      <div class="card">
+        <h2 class="card-title">Claude API key</h2>
+        <p class="hint">Used to analyze food photos. Stored only on this device. Get one at <span class="mono">console.anthropic.com</span>.</p>
+        <input id="api-key-input" type="password" placeholder="sk-ant-..." autocomplete="off">
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Daily goals</h2>
+        <label class="field"><span>Calories (kcal)</span><input id="goal-cal" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span>Protein (g)</span><input id="goal-pro" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span>Carbs (g)</span><input id="goal-carb" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span>Fat (g)</span><input id="goal-fat" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span>Calorie goal mode</span>
+          <select id="goal-mode">
+            <option value="under">Stay under (cutting)</option>
+            <option value="target">Hit target (±10%)</option>
+          </select>
+        </label>
+      </div>
+
+      <button id="save-settings" class="btn primary">Save settings</button>
+      <p id="settings-saved" class="hint saved-note hidden">Saved ✓</p>
+
+      <div class="card">
+        <h2 class="card-title">Data</h2>
+        <div class="btn-row">
+          <button id="export-csv" class="btn">Export CSV</button>
+          <button id="export-json" class="btn">Export JSON</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ CAMERA FAB ============ -->
+  <div class="fab-wrap">
+    <button id="manual-fab" class="fab small" title="Manual entry">✏️</button>
+    <button id="camera-fab" class="fab" title="Photo of food">📷</button>
+  </div>
+  <input id="photo-input" type="file" accept="image/*" capture="environment" class="hidden">
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabbar">
+    <button class="tab active" data-view="today"><span class="tab-icon">☀️</span>Today</button>
+    <button class="tab" data-view="history"><span class="tab-icon">📅</span>History</button>
+    <button class="tab" data-view="settings"><span class="tab-icon">⚙️</span>Settings</button>
+  </nav>
+
+  <!-- ============ REVIEW SHEET ============ -->
+  <div id="sheet-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="review-sheet" class="sheet hidden">
+    <h2 id="sheet-title" class="card-title">Review entry</h2>
+    <div id="analyze-state" class="analyze-state hidden">
+      <div class="spinner"></div>
+      <p>Analyzing your food…</p>
+    </div>
+    <div id="review-form">
+      <img id="review-thumb" class="review-thumb hidden" alt="Food photo">
+      <p id="review-meta" class="hint"></p>
+      <label class="field"><span>Food</span><input id="review-name" type="text" placeholder="e.g. Chicken burrito"></label>
+      <label class="field"><span>Portion</span><input id="review-portion" type="text" placeholder="e.g. 1 large bowl"></label>
+      <div class="field-grid">
+        <label class="field"><span>Calories</span><input id="review-cal" type="number" inputmode="decimal" min="0"></label>
+        <label class="field"><span>Protein (g)</span><input id="review-pro" type="number" inputmode="decimal" min="0"></label>
+        <label class="field"><span>Carbs (g)</span><input id="review-carb" type="number" inputmode="decimal" min="0"></label>
+        <label class="field"><span>Fat (g)</span><input id="review-fat" type="number" inputmode="decimal" min="0"></label>
+      </div>
+      <div class="btn-row">
+        <button id="review-cancel" class="btn">Cancel</button>
+        <button id="review-save" class="btn primary">Add to log</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
