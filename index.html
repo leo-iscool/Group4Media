@@ -116,6 +116,24 @@
       object-position: center;
     }
 
+    #home {
+      background-image: url('mobilehero.png');
+      background-size: cover;
+      background-position: center;
+    }
+
+    @media (min-width: 901px) {
+      #home {
+        background-image: none;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .hero-video {
+        display: none;
+      }
+    }
+
     .hero-overlay {
       position: absolute;
       inset: 0;
@@ -353,9 +371,18 @@
       margin-bottom: 80px;
     }
 
+    .services-sub {
+      font-size: 0.95rem;
+      line-height: 1.85;
+      color: rgba(255,255,255,0.55);
+      max-width: 560px;
+      margin: 0 auto;
+      font-weight: 300;
+    }
+
     .services-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 2px;
     }
 
@@ -621,39 +648,30 @@
   <!-- ── SERVICES ── -->
   <section id="services">
     <div class="services-header reveal">
-      <p class="section-label">What We Do</p>
-      <h2 class="section-heading">End-to-end <strong>production</strong></h2>
+      <p class="section-label">How We Work</p>
+      <h2 class="section-heading">Deeper stories, <strong>told properly</strong></h2>
+      <p class="services-sub">We make high-quality, documentary-style films about identity — who you are, why you exist, and the people behind it. One story, carried carefully from first conversation to final cut.</p>
     </div>
     <div class="services-grid">
       <div class="service-card reveal">
-        <p class="service-num">01</p>
-        <h3 class="service-name">Brand Films</h3>
-        <p class="service-desc">Cinematic narratives that define your brand's voice and leave a lasting impression on your audience.</p>
+        <p class="service-num">01 — Listen</p>
+        <h3 class="service-name">It starts with a conversation</h3>
+        <p class="service-desc">Before a camera ever comes out, we sit down with you to understand who you are, what you stand for, and the story you actually want to tell.</p>
       </div>
       <div class="service-card reveal">
-        <p class="service-num">02</p>
-        <h3 class="service-name">Commercial Production</h3>
-        <p class="service-desc">High-impact advertising content crafted for broadcast, digital, and social platforms.</p>
+        <p class="service-num">02 — Plan</p>
+        <h3 class="service-name">We shape the story together</h3>
+        <p class="service-desc">The people we'll interview, the questions we'll ask, the places we'll film, the feeling each scene should carry — all mapped out so nothing is left to chance.</p>
       </div>
       <div class="service-card reveal">
-        <p class="service-num">03</p>
-        <h3 class="service-name">Event Coverage</h3>
-        <p class="service-desc">Multi-camera event documentation that captures the energy and story of every live moment.</p>
+        <p class="service-num">03 — Shoot</p>
+        <h3 class="service-name">Real moments, filmed with intention</h3>
+        <p class="service-desc">Cinematic, documentary-style filming that puts people at ease. Honest interviews and genuine moments, captured with care in every frame.</p>
       </div>
       <div class="service-card reveal">
-        <p class="service-num">04</p>
-        <h3 class="service-name">Post Production</h3>
-        <p class="service-desc">Colour grading, sound design, motion graphics, and precision editing under one roof.</p>
-      </div>
-      <div class="service-card reveal">
-        <p class="service-num">05</p>
-        <h3 class="service-name">Social Content</h3>
-        <p class="service-desc">Platform-native short-form content designed to stop the scroll and drive engagement.</p>
-      </div>
-      <div class="service-card reveal">
-        <p class="service-num">06</p>
-        <h3 class="service-name">Documentary</h3>
-        <p class="service-desc">Long-form storytelling that digs deep — authentic, emotive, and built to endure.</p>
+        <p class="service-num">04 — Edit</p>
+        <h3 class="service-name">Where it all comes together</h3>
+        <p class="service-desc">We cut, colour, and sound-design until the film says exactly what you set out to say — then deliver it ready to share with the people who matter.</p>
       </div>
     </div>
   </section>
