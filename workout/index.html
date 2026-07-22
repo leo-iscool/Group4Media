@@ -89,6 +89,10 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
 }
 .exrow:focus-within .addset { display: block; }
 .addset:active { color: var(--accent); }
+.convert-tip {
+  display: block; font-size: 12px; font-weight: 650; color: var(--accent);
+  padding: 1px 0 3px; text-align: left;
+}
 .gap { height: 12px; position: relative; cursor: pointer; }
 .gap::before {
   content: ''; position: absolute; left: 0; right: 0; top: 5px;
@@ -340,8 +344,10 @@ function renderLog() {
   }
 }
 
-function renderDayRows(session, cont, focusIdx) {
+function renderDayRows(session, cont, focusIdx, keepRow) {
   cont.innerHTML = '';
+  // drop rows that never got anything written in them
+  session.rows = session.rows.filter((r) => r === keepRow || r.name.trim() || r.sets.some((x) => x && x.trim()));
   if (session.date === todayStr()) {
     // today always ends with a blank row to type into
     const last = session.rows[session.rows.length - 1];
@@ -368,9 +374,10 @@ function buildGap(session, cont) {
   g.addEventListener('click', () => {
     let idx = 0, el = g.previousElementSibling;
     while (el) { if (el.classList.contains('exrow')) idx++; el = el.previousElementSibling; }
-    session.rows.splice(idx, 0, { name: '', sets: [] });
+    const fresh = { name: '', sets: [] };
+    session.rows.splice(idx, 0, fresh);
     session.ts = Date.now();
-    renderDayRows(session, cont, idx);
+    renderDayRows(session, cont, idx, fresh);
   });
   return g;
 }
@@ -401,6 +408,36 @@ function buildRow(session, row, cont) {
     inp.enterKeyHint = 'next';
     inp.value = row.sets[i] || '';
     inp.dataset.i = i;
+
+    // when they write the *other* unit ("60kg" while set to lb), offer the conversion
+    let tip = null;
+    const applyConvert = () => {
+      inp.value = inp.value.replace(/(\d+(?:\.\d+)?)\s*(kg|lbs?)\b/gi, (m, num, u) => {
+        const uu = u.toLowerCase().startsWith('k') ? 'kg' : 'lb';
+        if (uu === unit) return num;
+        const v = parseFloat(num);
+        return String(Math.round((uu === 'kg' ? v * 2.20462 : v / 2.20462) * 10) / 10);
+      });
+      row.sets[i] = inp.value;
+      queueSave();
+      updateTip();
+    };
+    function updateTip() {
+      const m = inp.value.match(/(\d+(?:\.\d+)?)\s*(kg|lbs?)\b/i);
+      const typed = m ? (m[2].toLowerCase().startsWith('k') ? 'kg' : 'lb') : null;
+      if (!typed || typed === unit) { if (tip) { tip.remove(); tip = null; } return; }
+      const v = parseFloat(m[1]);
+      const conv = Math.round((typed === 'kg' ? v * 2.20462 : v / 2.20462) * 10) / 10;
+      if (!tip) {
+        tip = document.createElement('button');
+        tip.className = 'convert-tip';
+        tip.addEventListener('pointerdown', (e) => { e.preventDefault(); applyConvert(); });
+        inp.after(tip);
+      }
+      tip.textContent = `= ${conv} ${unit} · tap to convert`;
+    }
+    inp._updateTip = updateTip;
+
     inp.addEventListener('input', () => {
       // autocorrect 'for' typos once the next character lands: "135 fur 8" -> "135 for 8"
       const fixed = inp.value.replace(/\b(fir|fur|fro|fot)(?=[\s\d.,])/gi, 'for');
@@ -412,6 +449,7 @@ function buildRow(session, row, cont) {
       row.sets[i] = inp.value;
       session.ts = Date.now();
       queueSave();
+      updateTip();
       ensureTrailingRow();
     });
     inp.addEventListener('keydown', (e) => {
@@ -431,6 +469,7 @@ function buildRow(session, row, cont) {
       const inp = setInput(i);
       inp.placeholder = g[i] || (i === 0 ? (g.length ? '' : 'weight for reps') : '');
       setCol.appendChild(inp);
+      inp._updateTip();
     }
     const add = document.createElement('button');
     add.className = 'addset';
@@ -475,10 +514,21 @@ function buildRow(session, row, cont) {
     });
   }
 
+  // long names shrink until they fit instead of getting cut off
+  function fitName() {
+    nm.style.fontSize = '';
+    let size = 16;
+    while (nm.scrollWidth > nm.clientWidth && size > 11) {
+      size--;
+      nm.style.fontSize = size + 'px';
+    }
+  }
+
   nm.addEventListener('input', () => {
     row.name = nm.value;
     session.ts = Date.now();
     queueSave();
+    fitName();
     refreshGhosts();
     ensureTrailingRow();
   });
@@ -494,9 +544,36 @@ function buildRow(session, row, cont) {
     if (next) next.querySelector('.nm-col input').focus();
   }
 
+  // when focus leaves the row: drop blank set lines, and if nothing was
+  // ever written, remove the whole row (accidental inserts vanish)
+  el.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (el.contains(document.activeElement)) return;
+      const kept = row.sets.filter((x) => x && x.trim());
+      if (kept.length !== row.sets.length) {
+        row.sets = kept;
+        renderSets();
+      }
+      const isTodayTrailing = session.date === todayStr() && session.rows[session.rows.length - 1] === row;
+      if (!isTodayTrailing && !row.name.trim() && !row.sets.length) {
+        const idx = session.rows.indexOf(row);
+        if (idx > -1) session.rows.splice(idx, 1);
+        const prev = el.previousElementSibling;
+        if (prev && prev.classList.contains('gap')) prev.remove();
+        else {
+          const nx = el.nextElementSibling;
+          if (nx && nx.classList.contains('gap')) nx.remove();
+        }
+        el.remove();
+      }
+      queueSave();
+    }, 80);
+  });
+
   el.appendChild(nmCol);
   el.appendChild(setCol);
   renderSets();
+  requestAnimationFrame(fitName);
   return el;
 }
 
@@ -651,9 +728,25 @@ main.addEventListener('click', (e) => {
 $('tabLog').addEventListener('click', () => { view = { screen: 'log' }; render(); });
 $('tabProgress').addEventListener('click', () => { persist(); view = { screen: 'progress' }; render(); });
 $('backBtn').addEventListener('click', () => { view = { screen: 'progress' }; render(); });
+/* converting a whole set line's weights when the unit setting flips */
+function convertLine(s, to) {
+  return s.replace(/(\d+(?:\.\d+)?)\s*(kg|lbs?)?\s*(?=[x×]|(?:for|fir|fur|fro|fot)\b)/gi, (m, num, u) => {
+    const from = u ? (u.toLowerCase().startsWith('k') ? 'kg' : 'lb') : (to === 'lb' ? 'kg' : 'lb');
+    const v = parseFloat(num);
+    if (from === to) return num + ' ';
+    return String(Math.round((from === 'kg' ? v * 2.20462 : v / 2.20462) * 10) / 10) + ' ';
+  });
+}
+
 $('unitBtn').addEventListener('click', () => {
-  unit = unit === 'lb' ? 'kg' : 'lb';
+  const to = unit === 'lb' ? 'kg' : 'lb';
+  if (!confirm(`Change weights from ${unit} to ${to}? Everything you've logged will be converted (135 ${unit} becomes ${Math.round((unit === 'lb' ? 135 / 2.20462 : 135 * 2.20462) * 10) / 10} ${to}).`)) return;
+  sessions.forEach((s) => s.rows.forEach((r) => {
+    r.sets = r.sets.map((x) => convertLine(x, to));
+  }));
+  unit = to;
   localStorage.setItem(UNIT_KEY, unit);
+  persist();
   render();
 });
 window.addEventListener('pagehide', persist);
