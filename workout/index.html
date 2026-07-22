@@ -27,6 +27,7 @@
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
   --accent: #2a78d6;
+  --accent-soft: rgba(42, 120, 214, 0.12);
   --danger: #d03b3b;
 }
 @media (prefers-color-scheme: dark) {
@@ -42,6 +43,7 @@
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.10);
     --accent: #3987e5;
+    --accent-soft: rgba(57, 135, 229, 0.16);
     --danger: #e66767;
   }
 }
@@ -103,6 +105,51 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
   border-top: 1px dashed var(--grid); opacity: 0; transition: opacity 0.15s;
 }
 .gap:hover::before, .gap:active::before { opacity: 1; }
+.exrow.dragging {
+  opacity: 0.92; background: var(--surface); position: relative; z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); border-radius: 10px;
+}
+.nm-col { touch-action: manipulation; }
+
+/* ---------- basic / advanced ---------- */
+.modes { display: flex; justify-content: flex-end; gap: 2px; margin: 2px 0 2px; }
+.modes button {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  padding: 4px 11px; border-radius: 999px;
+}
+.modes button.on { color: var(--accent); background: var(--accent-soft); }
+.adv { margin: 2px 0 6px; }
+.week { display: flex; gap: 4px; }
+.wk {
+  flex: 1; min-width: 0; text-align: center; padding: 6px 0 5px;
+  border-radius: 10px; color: var(--muted); font-size: 11px; font-weight: 700;
+}
+.wk span {
+  display: block; font-size: 10px; font-weight: 600; margin-top: 2px;
+  color: var(--ink-2); min-height: 13px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; padding: 0 2px;
+}
+.wk.today { background: var(--accent-soft); color: var(--accent); }
+.plansline {
+  display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: center;
+  margin-top: 4px; font-size: 13px;
+}
+.plansline .lbl { color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.plansline .pl { font-weight: 650; color: var(--ink-2); padding: 3px 0; }
+.plansline .newpl { color: var(--accent); font-weight: 700; padding: 3px 0; }
+
+/* ---------- plan editor ---------- */
+.plan-name { font-size: 20px; font-weight: 700; margin: 6px 0 2px; }
+.pex-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--grid); }
+.pex-row input { font-size: 16px; }
+.pex-row .rm { color: var(--muted); font-size: 15px; padding: 2px 8px; }
+.addex { display: block; color: var(--accent); font-weight: 650; padding: 10px 0; font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips button {
+  font-size: 13px; font-weight: 600; color: var(--ink-2);
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
+}
+.del-plan { display: block; margin: 30px auto 0; color: var(--danger); font-weight: 650; font-size: 14px; padding: 8px 16px; }
 
 /* ---------- progress list ---------- */
 .p-row {
@@ -222,10 +269,23 @@ migrate();
 
 const loadSessions = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
 
+const PLANS_KEY = 'liftlog.plans.v1';
+const WEEK_KEY = 'liftlog.week.v1';
+const MODE_KEY = 'liftlog.mode';
+const loadJSON = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
+
 let sessions = loadSessions();     // [{id, date:'YYYY-MM-DD', rows:[{name, sets:['135 for 8',...]}], ts}]
 let unit = localStorage.getItem(UNIT_KEY) || 'lb';
-let view = { screen: 'log', exercise: null };
+let plans = loadJSON(PLANS_KEY, []);      // [{id, name, exercises:[names]}]
+let weekMap = loadJSON(WEEK_KEY, {});     // {dow(0-6): planId}
+let mode = localStorage.getItem(MODE_KEY) || 'basic';
+let view = { screen: 'log', exercise: null, planId: null };
 let saveTimer = null;
+
+function persistPlans() {
+  localStorage.setItem(PLANS_KEY, JSON.stringify(plans));
+  localStorage.setItem(WEEK_KEY, JSON.stringify(weekMap));
+}
 
 function persist() {
   const clean = sessions
@@ -313,24 +373,50 @@ function prevSetsFor(name, date) {
 const main = $('main');
 
 function render() {
-  $('backBtn').style.display = view.screen === 'detail' ? 'block' : 'none';
-  $('tabLog').classList.toggle('active', view.screen === 'log');
-  $('tabProgress').classList.toggle('active', view.screen !== 'log');
+  $('backBtn').style.display = (view.screen === 'detail' || view.screen === 'plan') ? 'block' : 'none';
+  $('tabLog').classList.toggle('active', view.screen === 'log' || view.screen === 'plan');
+  $('tabProgress').classList.toggle('active', view.screen === 'progress' || view.screen === 'detail');
   $('unitBtn').textContent = unit;
   if (view.screen === 'log') { $('title').textContent = 'Lift Log'; renderLog(); }
+  else if (view.screen === 'plan') { renderPlan(); }
   else if (view.screen === 'progress') { $('title').textContent = 'Progress'; renderProgress(); }
   else { $('title').textContent = view.exercise; renderDetail(view.exercise); }
 }
 
 /* ---------- the open sheet ---------- */
+function applyTodaysPlan() {
+  if (mode !== 'advanced') return;
+  const s = sessions.find((x) => x.date === todayStr());
+  const pid = weekMap[new Date().getDay()];
+  if (!s || !pid || s.planApplied === pid) return;
+  const plan = plans.find((p) => p.id === pid);
+  if (!plan) return;
+  const hasContent = s.rows.some((r) => r.name.trim() || r.sets.some((x) => x && x.trim()));
+  if (hasContent) return;
+  s.rows = plan.exercises.filter((n) => n.trim()).map((n) => ({ name: n, sets: [] }));
+  s.planApplied = pid;
+  persist();
+}
+
 function renderLog() {
   clearTimeout(saveTimer);
   // make sure today exists
   if (!sessions.some((s) => s.date === todayStr())) {
     sessions.push({ id: Date.now().toString(36), date: todayStr(), rows: [], ts: Date.now() });
   }
+  applyTodaysPlan();
   const sorted = sessions.slice().sort((a, b) => b.date < a.date ? -1 : 1);
   main.innerHTML = '';
+
+  // basic / advanced switch
+  const modes = document.createElement('div');
+  modes.className = 'modes';
+  modes.innerHTML = `
+    <button data-mode="basic" class="${mode === 'basic' ? 'on' : ''}">Basic</button>
+    <button data-mode="advanced" class="${mode === 'advanced' ? 'on' : ''}">Advanced</button>`;
+  main.appendChild(modes);
+
+  if (mode === 'advanced') main.appendChild(buildAdvStrip());
 
   const hasAny = sessions.some((s) => s.rows.some((r) => r.name.trim() || r.sets.some((x) => x.trim())));
   sorted.forEach((s) => {
@@ -351,6 +437,149 @@ function renderLog() {
     hint.innerHTML = `Type an exercise on the left, hit return, and write the weight on the right &mdash; like <b>135 for 13</b>. Return again for another set. Next workout, last time&rsquo;s numbers show up grayed out so you know what to beat.`;
     main.querySelector('.day').appendChild(hint);
   }
+}
+
+/* ---------- advanced: week calendar + plans ---------- */
+const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const DOW_L = { 1: 'M', 2: 'T', 3: 'W', 4: 'T', 5: 'F', 6: 'S', 0: 'S' };
+
+function buildAdvStrip() {
+  const wrap = document.createElement('div');
+  wrap.className = 'adv';
+  const todayDow = new Date().getDay();
+  wrap.innerHTML = `
+    <div class="week">${DOW_ORDER.map((d) => {
+      const p = plans.find((x) => x.id === weekMap[d]);
+      return `<button class="wk ${d === todayDow ? 'today' : ''}" data-dow="${d}">${DOW_L[d]}<span>${p ? esc(p.name || 'Plan') : '–'}</span></button>`;
+    }).join('')}</div>
+    <div class="plansline">
+      <span class="lbl">Plans</span>
+      ${plans.map((p) => `<button class="pl" data-plan="${p.id}">${esc(p.name || 'Plan')}</button>`).join('')}
+      <button class="newpl" data-newplan>+ New plan</button>
+    </div>`;
+  return wrap;
+}
+
+function newPlan() {
+  const p = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', exercises: [] };
+  plans.push(p);
+  persistPlans();
+  view = { screen: 'plan', planId: p.id };
+  render();
+}
+
+function removePlan(id) {
+  plans = plans.filter((p) => p.id !== id);
+  Object.keys(weekMap).forEach((d) => { if (weekMap[d] === id) delete weekMap[d]; });
+  persistPlans();
+}
+
+function leavePlanEditor() {
+  const plan = plans.find((p) => p.id === view.planId);
+  if (plan) {
+    plan.exercises = plan.exercises.filter((n) => n.trim());
+    if (!plan.name.trim() && !plan.exercises.length) removePlan(plan.id);
+    else persistPlans();
+  }
+}
+
+function knownExercises() {
+  const seen = new Map();
+  allEntries().forEach((e) => seen.set(e.name.toLowerCase(), e.name));
+  plans.forEach((p) => p.exercises.forEach((n) => { if (n.trim()) seen.set(n.toLowerCase(), n); }));
+  return [...seen.values()];
+}
+
+function renderPlan() {
+  const plan = plans.find((p) => p.id === view.planId);
+  if (!plan) { view = { screen: 'log' }; render(); return; }
+  $('title').textContent = plan.name || 'New plan';
+  main.innerHTML = '';
+
+  const nameInp = document.createElement('input');
+  nameInp.className = 'plan-name';
+  nameInp.placeholder = 'Plan name (e.g. Legs)';
+  nameInp.autocapitalize = 'words';
+  nameInp.value = plan.name;
+  nameInp.addEventListener('input', () => {
+    plan.name = nameInp.value;
+    persistPlans();
+    $('title').textContent = plan.name || 'New plan';
+  });
+  main.appendChild(nameInp);
+
+  const head = document.createElement('div');
+  head.className = 'section-head';
+  head.textContent = 'Exercises';
+  main.appendChild(head);
+  const list = document.createElement('div');
+  main.appendChild(list);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'addex';
+  addBtn.textContent = '+ Add exercise';
+  addBtn.addEventListener('click', () => {
+    plan.exercises.push('');
+    renderList();
+    const inputs = list.querySelectorAll('input');
+    inputs[inputs.length - 1].focus();
+  });
+  main.appendChild(addBtn);
+
+  const chipHead = document.createElement('div');
+  chipHead.className = 'section-head';
+  chipHead.textContent = 'From your notes';
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  main.appendChild(chipHead);
+  main.appendChild(chips);
+
+  const del = document.createElement('button');
+  del.className = 'del-plan';
+  del.textContent = 'Delete plan';
+  del.addEventListener('click', () => {
+    removePlan(plan.id);
+    view = { screen: 'log' };
+    render();
+  });
+  main.appendChild(del);
+
+  function renderList() {
+    list.innerHTML = '';
+    plan.exercises.forEach((n, i) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'pex-row';
+      const inp = document.createElement('input');
+      inp.value = n;
+      inp.placeholder = 'Exercise';
+      inp.autocapitalize = 'words';
+      inp.enterKeyHint = 'next';
+      inp.addEventListener('input', () => { plan.exercises[i] = inp.value; persistPlans(); renderChips(); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); } });
+      const rm = document.createElement('button');
+      rm.className = 'rm';
+      rm.textContent = '✕';
+      rm.addEventListener('click', () => { plan.exercises.splice(i, 1); persistPlans(); renderList(); renderChips(); });
+      rowEl.appendChild(inp);
+      rowEl.appendChild(rm);
+      list.appendChild(rowEl);
+    });
+  }
+  function renderChips() {
+    const inPlan = new Set(plan.exercises.map((n) => n.trim().toLowerCase()));
+    const avail = knownExercises().filter((n) => !inPlan.has(n.toLowerCase()));
+    chipHead.style.display = avail.length ? '' : 'none';
+    chips.innerHTML = '';
+    avail.forEach((n) => {
+      const b = document.createElement('button');
+      b.textContent = n;
+      b.addEventListener('click', () => { plan.exercises.push(n); persistPlans(); renderList(); renderChips(); });
+      chips.appendChild(b);
+    });
+  }
+  renderList();
+  renderChips();
+  if (!plan.name) setTimeout(() => nameInp.focus(), 100);
 }
 
 function renderDayRows(session, cont, focusIdx, keepRow) {
@@ -553,6 +782,53 @@ function buildRow(session, row, cont) {
     if (next) next.querySelector('.nm-col input').focus();
   }
 
+  // hold the name for half a second, then drag the exercise up or down
+  el._row = row;
+  nmCol.addEventListener('pointerdown', (e) => {
+    const startY = e.clientY;
+    let holdTimer = setTimeout(() => startDrag(), 450);
+    const cancel = () => { clearTimeout(holdTimer); nmCol.removeEventListener('pointermove', moveCheck); };
+    const moveCheck = (ev) => { if (Math.abs(ev.clientY - startY) > 8) cancel(); };
+    nmCol.addEventListener('pointermove', moveCheck);
+    nmCol.addEventListener('pointerup', cancel, { once: true });
+    nmCol.addEventListener('pointercancel', cancel, { once: true });
+
+    function startDrag() {
+      nmCol.removeEventListener('pointermove', moveCheck);
+      if (document.activeElement) document.activeElement.blur();
+      el.classList.add('dragging');
+      cont.querySelectorAll('.gap').forEach((g) => g.remove());
+      const stopScroll = (ev) => ev.preventDefault();
+      window.addEventListener('touchmove', stopScroll, { passive: false });
+      const onMove = (ev) => {
+        const y = ev.clientY;
+        const others = [...cont.querySelectorAll('.exrow')].filter((r) => r !== el);
+        const all = [...cont.children];
+        for (const r of others) {
+          const b = r.getBoundingClientRect();
+          const mid = b.top + b.height / 2;
+          if (all.indexOf(r) < all.indexOf(el) && y < mid) { cont.insertBefore(el, r); break; }
+          if (all.indexOf(r) > all.indexOf(el) && y > mid) { cont.insertBefore(el, r.nextSibling); break; }
+        }
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        window.removeEventListener('touchmove', stopScroll);
+        el.classList.remove('dragging');
+        session.rows = [...cont.querySelectorAll('.exrow')].map((r) => r._row);
+        session.ts = Date.now();
+        persist();
+        renderDayRows(session, cont);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }
+  });
+  nmCol.addEventListener('contextmenu', (e) => e.preventDefault());
+
   // when focus leaves the row: drop blank set lines, and if nothing was
   // ever written, remove the whole row (accidental inserts vanish)
   el.addEventListener('focusout', () => {
@@ -724,6 +1000,23 @@ function drawChart(wrap, points, mUnit) {
 
 /* ================= events ================= */
 main.addEventListener('click', (e) => {
+  const mb = e.target.closest('[data-mode]');
+  if (mb) { mode = mb.dataset.mode; localStorage.setItem(MODE_KEY, mode); render(); return; }
+  const wk = e.target.closest('[data-dow]');
+  if (wk) {
+    if (!plans.length) { newPlan(); return; }
+    // tap a weekday to cycle: none -> plan 1 -> plan 2 -> ... -> none
+    const d = wk.dataset.dow;
+    const idx = plans.findIndex((p) => p.id === weekMap[d]);
+    const next = idx === -1 ? plans[0].id : (plans[idx + 1] ? plans[idx + 1].id : undefined);
+    if (next === undefined) delete weekMap[d]; else weekMap[d] = next;
+    persistPlans();
+    render();
+    return;
+  }
+  const pl = e.target.closest('[data-plan]');
+  if (pl) { view = { screen: 'plan', planId: pl.dataset.plan }; render(); return; }
+  if (e.target.closest('[data-newplan]')) { newPlan(); return; }
   const det = e.target.closest('[data-detail]');
   if (det) { view = { screen: 'detail', exercise: det.dataset.detail }; render(); return; }
   const day = e.target.closest('[data-day]');
@@ -734,9 +1027,13 @@ main.addEventListener('click', (e) => {
     if (el) el.scrollIntoView({ block: 'start', behavior: 'instant' });
   }
 });
-$('tabLog').addEventListener('click', () => { view = { screen: 'log' }; render(); });
-$('tabProgress').addEventListener('click', () => { persist(); view = { screen: 'progress' }; render(); });
-$('backBtn').addEventListener('click', () => { view = { screen: 'progress' }; render(); });
+$('tabLog').addEventListener('click', () => { if (view.screen === 'plan') leavePlanEditor(); view = { screen: 'log' }; render(); });
+$('tabProgress').addEventListener('click', () => { if (view.screen === 'plan') leavePlanEditor(); persist(); view = { screen: 'progress' }; render(); });
+$('backBtn').addEventListener('click', () => {
+  if (view.screen === 'plan') { leavePlanEditor(); view = { screen: 'log' }; }
+  else view = { screen: 'progress' };
+  render();
+});
 /* converting a whole set line's weights when the unit setting flips */
 function convertLine(s, to) {
   return s.replace(/(\d+(?:\.\d+)?)\s*(kg|lbs?)?\s*(?=[x×]|(?:for|fir|fur|fro|fot)\b)/gi, (m, num, u) => {
