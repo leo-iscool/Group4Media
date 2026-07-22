@@ -68,6 +68,40 @@ input::placeholder { color: var(--ghost); opacity: 1; }
 .topbar h1 { font-size: 20px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .back-btn { font-size: 15px; font-weight: 600; color: var(--accent); padding: 6px 8px 6px 0; display: none; }
 .unit-btn { font-size: 13px; font-weight: 600; color: var(--muted); padding: 5px 4px; }
+.rest-btn { font-size: 13px; font-weight: 700; color: var(--accent); padding: 5px 8px; }
+
+/* ---------- rest timer ---------- */
+.rest {
+  position: fixed; inset: 0; z-index: 30; background: var(--page);
+  display: flex; flex-direction: column; align-items: center;
+  padding: calc(20px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.rest h2 { font-size: 18px; margin-bottom: 4px; }
+.rest .sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; text-align: center; }
+.rest-durs { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 300px; }
+.rest-durs button {
+  font-size: 17px; font-weight: 700; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 0; width: 86px; background: var(--surface);
+}
+.rest-durs button:active { border-color: var(--accent); color: var(--accent); }
+.rest-cancel { margin-top: 26px; color: var(--muted); font-weight: 650; font-size: 14px; padding: 8px 16px; }
+.rest-count {
+  font-size: 64px; font-weight: 800; font-variant-numeric: tabular-nums;
+  margin: 8px 0 2px; letter-spacing: 0.02em;
+}
+.rest-track { width: 100%; max-width: 320px; height: 4px; background: var(--grid); border-radius: 2px; margin: 10px 0 22px; overflow: hidden; }
+.rest-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.25s linear; }
+.ad-slot {
+  width: 100%; max-width: 336px; min-height: 280px; flex: 0 0 auto;
+  border: 1px dashed var(--axis); border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ghost); font-size: 13px; font-weight: 600; text-align: center;
+  padding: 12px;
+}
+.rest-skip { margin-top: 18px; color: var(--muted); font-weight: 650; font-size: 14px; padding: 8px 16px; }
+.rest-done { font-size: 22px; font-weight: 800; color: var(--accent); margin-top: 8px; }
 .unit-confirm { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .unit-confirm button { font-size: 13px; font-weight: 700; padding: 5px 8px; }
 #unitYes { color: var(--accent); }
@@ -250,6 +284,7 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
 <header class="topbar">
   <button class="back-btn" id="backBtn">&#8249; Back</button>
   <h1 id="title">Lift Log</h1>
+  <button class="rest-btn" id="restBtn">&#9201; Rest</button>
   <div class="unit-confirm hidden" id="unitConfirm">
     <span id="unitConfirmMsg">Convert to kg?</span>
     <button id="unitYes">Yes</button>
@@ -1180,6 +1215,96 @@ $('picFile').addEventListener('change', async (e) => {
   });
   if (view.screen === 'pics') renderPics();
 });
+
+/* ================= rest timer =================
+   Full-screen rest between sets: pick a duration, the countdown takes
+   over the screen so there's nothing else to scroll. The .ad-slot box
+   is reserved for a real ad unit — once you have an ad network account
+   (e.g. Google AdSense), paste its snippet into #adSlot below and the
+   ad will fill the slot for the duration of every rest. */
+let restTimer = null;
+let wakeLock = null;
+
+function restBeep() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = (t, f) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f;
+      o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.25, ac.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + t + 0.35);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.4);
+    };
+    beep(0, 880); beep(0.45, 880); beep(0.9, 1175);
+  } catch {}
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+function closeRest() {
+  clearInterval(restTimer);
+  restTimer = null;
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  document.querySelector('.rest')?.remove();
+}
+
+function openRestPicker() {
+  closeRest();
+  const el = document.createElement('div');
+  el.className = 'rest';
+  el.innerHTML = `
+    <h2>Rest</h2>
+    <div class="sub">Pick how long &mdash; the screen stays here<br>so your phone can't steal the rest.</div>
+    <div class="rest-durs">
+      ${[30, 60, 120, 180, 240, 300].map((s) =>
+        `<button data-rest="${s}">${s < 60 ? s + 's' : (s / 60) + ':00'}</button>`).join('')}
+    </div>
+    <button class="rest-cancel">Cancel</button>`;
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rest]');
+    if (b) { startRest(parseInt(b.dataset.rest, 10)); return; }
+    if (e.target.closest('.rest-cancel')) closeRest();
+  });
+  document.body.appendChild(el);
+}
+
+function startRest(seconds) {
+  closeRest();
+  const el = document.createElement('div');
+  el.className = 'rest';
+  el.innerHTML = `
+    <div class="rest-count" id="restCount"></div>
+    <div class="rest-track"><div class="rest-fill" id="restFill" style="width:100%"></div></div>
+    <div class="ad-slot" id="adSlot">Ad space<br>(plug your ad network in here)</div>
+    <button class="rest-skip">Skip rest</button>`;
+  el.querySelector('.rest-skip').addEventListener('click', closeRest);
+  document.body.appendChild(el);
+
+  if (navigator.wakeLock) navigator.wakeLock.request('screen').then((l) => { wakeLock = l; }).catch(() => {});
+
+  const end = Date.now() + seconds * 1000;
+  const count = el.querySelector('#restCount');
+  const fill = el.querySelector('#restFill');
+  const tick = () => {
+    const left = Math.max(0, end - Date.now());
+    const s = Math.ceil(left / 1000);
+    count.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    fill.style.width = (left / (seconds * 1000) * 100) + '%';
+    if (left <= 0) {
+      clearInterval(restTimer);
+      restTimer = null;
+      restBeep();
+      count.textContent = '0:00';
+      el.querySelector('.rest-skip').remove();
+      el.insertAdjacentHTML('beforeend', '<div class="rest-done">Rest over — back to work</div>');
+      setTimeout(closeRest, 2500);
+    }
+  };
+  tick();
+  restTimer = setInterval(tick, 250);
+}
+
+$('restBtn').addEventListener('click', openRestPicker);
 
 /* ================= line chart (SVG) ================= */
 function drawChart(wrap, points, mUnit) {
