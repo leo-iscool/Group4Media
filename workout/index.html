@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Lift Log</title>
-<meta name="description" content="A dead-simple workout notebook: just type what you did and it tracks weight, sets and reps per exercise.">
+<meta name="description" content="A dead-simple workout notebook: name on the left, weight and reps on the right, progress tracked per exercise.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -22,11 +22,11 @@
   --ink: #0b0b0b;
   --ink-2: #52514e;
   --muted: #898781;
+  --ghost: #b5b3ac;
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
   --accent: #2a78d6;
-  --accent-soft: rgba(42, 120, 214, 0.10);
   --danger: #d03b3b;
 }
 @media (prefers-color-scheme: dark) {
@@ -37,11 +37,11 @@
     --ink: #ffffff;
     --ink-2: #c3c2b7;
     --muted: #898781;
+    --ghost: #5d5c57;
     --grid: #2c2c2a;
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.10);
     --accent: #3987e5;
-    --accent-soft: rgba(57, 135, 229, 0.16);
     --danger: #e66767;
   }
 }
@@ -54,124 +54,59 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-input, textarea { font: inherit; color: inherit; }
+input { font: inherit; color: inherit; background: transparent; border: none; outline: none; width: 100%; padding: 0; border-radius: 0; }
+input::placeholder { color: var(--ghost); opacity: 1; }
 
 .topbar {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 8px;
-  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+  padding: calc(14px + env(safe-area-inset-top)) 20px 12px;
   background: var(--page);
-  border-bottom: 1px solid var(--border);
 }
 .topbar h1 { font-size: 20px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .back-btn { font-size: 15px; font-weight: 600; color: var(--accent); padding: 6px 8px 6px 0; display: none; }
-.unit-btn {
-  font-size: 13px; font-weight: 600; color: var(--ink-2);
-  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
-  background: var(--surface);
+.unit-btn { font-size: 13px; font-weight: 600; color: var(--muted); padding: 5px 4px; }
+
+main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
+
+.empty-hint { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 24px 0; }
+
+/* ---------- the sheet ---------- */
+.day-head {
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin: 28px 0 4px;
 }
-
-main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
-
-.empty { text-align: center; color: var(--muted); padding: 56px 24px; line-height: 1.6; font-size: 15px; }
-.empty strong { color: var(--ink-2); display: block; font-size: 17px; margin-bottom: 6px; }
-.empty code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 13px; }
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  width: 100%;
-  text-align: left;
+.day:first-child .day-head { margin-top: 8px; }
+.exrow { display: flex; align-items: stretch; }
+.nm-col { width: 44%; padding: 10px 12px 10px 0; }
+.nm-col input { font-size: 16px; font-weight: 600; }
+.set-col { flex: 1; border-left: 1px solid var(--axis); padding: 10px 0 10px 14px; }
+.set-col input { font-size: 16px; color: var(--ink-2); display: block; padding: 2px 0; }
+.addset {
+  font-size: 13px; font-weight: 600; color: var(--ghost); padding: 4px 0 0;
   display: block;
 }
-.note-date { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-.note-line { font-size: 15px; line-height: 1.45; margin-bottom: 6px; }
-.note-line:last-child { margin-bottom: 0; }
-.note-line .nm { font-weight: 650; }
-.note-line .st { color: var(--ink-2); }
-.note-line.plain { color: var(--muted); font-style: italic; font-size: 14px; }
+.addset:active { color: var(--accent); }
 
-.ex-row { display: flex; align-items: center; gap: 12px; }
-.ex-row .grow { flex: 1; min-width: 0; }
-.ex-row .name { font-size: 16px; font-weight: 650; }
-.ex-row .meta { font-size: 13px; color: var(--muted); margin-top: 3px; }
-.ex-row .big { font-size: 17px; font-weight: 700; white-space: nowrap; }
-.ex-row .big small { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* ---------- progress list ---------- */
+.p-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 14px 0; border-bottom: 1px solid var(--grid);
+}
+.p-row .grow { flex: 1; min-width: 0; }
+.p-row .name { font-size: 16px; font-weight: 650; }
+.p-row .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.p-row .big { font-size: 17px; font-weight: 700; white-space: nowrap; }
+.p-row .big small { font-size: 12px; font-weight: 600; color: var(--muted); }
 .chev { color: var(--muted); font-size: 18px; }
 
-.fab {
-  position: fixed; right: 20px; bottom: calc(84px + env(safe-area-inset-bottom));
-  width: 56px; height: 56px; border-radius: 50%;
-  background: var(--accent); color: #fff; font-size: 30px; line-height: 1;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-}
-
-.tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tabbar button {
-  flex: 1; padding: 10px 0 12px; font-size: 12px; font-weight: 600; color: var(--muted);
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-}
-.tabbar button.active { color: var(--accent); }
-.tabbar svg { width: 24px; height: 24px; }
-
-/* ---- Editor (the note) ---- */
-.date-btn {
-  display: inline-block; font-size: 13px; font-weight: 650; color: var(--ink-2);
-  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
-  padding: 6px 12px; margin-bottom: 12px; position: relative;
-}
-.date-btn input {
-  position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%;
-}
-.note-input {
-  width: 100%; min-height: 140px; resize: none;
-  background: transparent; border: none; outline: none;
-  font-size: 17px; line-height: 1.6; caret-color: var(--accent);
-}
-.note-input::placeholder { color: var(--muted); }
-.parsed { margin-top: 8px; }
-.parsed-line {
-  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
-  padding: 10px 0; border-top: 1px solid var(--grid);
-}
-.parsed-line .nm { font-size: 15px; font-weight: 650; margin-right: 2px; }
-.parsed-line.plain { color: var(--muted); font-style: italic; font-size: 14px; }
-.chip {
-  font-size: 12px; font-weight: 650; color: var(--accent);
-  background: var(--accent-soft); border-radius: 999px; padding: 3px 9px;
-  white-space: nowrap;
-}
-.chip.dim { color: var(--muted); background: transparent; border: 1px solid var(--border); font-weight: 600; }
-.hint { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 16px; }
-.hint code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 12px; }
-.del-note { display: block; margin: 28px auto 0; color: var(--danger); font-weight: 650; font-size: 14px; padding: 8px 16px; }
-
-/* ---- Detail view ---- */
-.stats { display: flex; gap: 8px; margin-bottom: 16px; }
-.stat {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 12px 8px; text-align: center;
-}
-.stat .v { font-size: 20px; font-weight: 700; }
-.stat .v small { font-size: 12px; font-weight: 600; color: var(--muted); }
-.stat .k { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 3px; }
-
-.chart-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  padding: 16px 12px 8px; margin-bottom: 16px;
-}
-.chart-title { font-size: 13px; font-weight: 700; color: var(--ink-2); margin: 0 6px 8px; }
-.chart-wrap { position: relative; touch-action: pan-y; }
+/* ---------- detail ---------- */
+.statline { font-size: 14px; color: var(--ink-2); margin: 4px 0 20px; }
+.statline b { font-size: 16px; color: var(--ink); }
+.statline span { margin-right: 14px; }
+.chart-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.chart-wrap { position: relative; touch-action: pan-y; margin-bottom: 8px; }
 .chart-wrap svg { display: block; width: 100%; height: auto; }
 .tip {
   position: absolute; pointer-events: none; display: none;
@@ -181,7 +116,28 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
   transform: translate(-50%, -100%); z-index: 3;
 }
 .tip .d { font-weight: 500; opacity: 0.75; }
-.section-head { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 4px 8px; }
+.section-head { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 24px 0 4px; }
+.h-row {
+  display: flex; align-items: baseline; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 0; border-bottom: 1px solid var(--grid);
+}
+.h-row .grow { flex: 1; min-width: 0; font-size: 15px; color: var(--ink-2); }
+.h-row .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+/* ---------- tabbar ---------- */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex;
+  background: var(--page);
+  border-top: 1px solid var(--grid);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabbar button {
+  flex: 1; padding: 10px 0 12px; font-size: 12px; font-weight: 600; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.tabbar button.active { color: var(--accent); }
+.tabbar svg { width: 24px; height: 24px; }
 .hidden { display: none !important; }
 </style>
 </head>
@@ -194,8 +150,6 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 </header>
 
 <main id="main"></main>
-
-<button class="fab" id="fab" aria-label="New note">+</button>
 
 <nav class="tabbar">
   <button id="tabLog" class="active">
@@ -212,32 +166,56 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 'use strict';
 
 /* ================= storage ================= */
-const KEY = 'liftlog.notes.v2';
-const OLD_KEY = 'liftlog.entries.v1';
+const KEY = 'liftlog.sessions.v3';
 const UNIT_KEY = 'liftlog.unit';
 
+/* one-time migration from the v2 free-text notes */
 function migrate() {
   if (localStorage.getItem(KEY)) return;
   let old;
-  try { old = JSON.parse(localStorage.getItem(OLD_KEY)); } catch { old = null; }
+  try { old = JSON.parse(localStorage.getItem('liftlog.notes.v2')); } catch { old = null; }
   if (!old || !old.length) return;
-  const byDate = {};
-  old.sort((a, b) => a.ts - b.ts).forEach((e) => {
-    const line = `${e.exercise} ` + e.sets.map((s) => s.w > 0 ? `${s.w}x${s.r}` : `${s.r}`).join(' ')
-      + (e.note ? `\n${e.note}` : '');
-    byDate[e.date] = byDate[e.date] ? byDate[e.date] + '\n' + line : line;
-  });
-  const notes = Object.keys(byDate).map((d, i) => ({ id: 'm' + i, date: d, text: byDate[d], ts: Date.now() }));
-  localStorage.setItem(KEY, JSON.stringify(notes));
+  const sessions = old.map((n, i) => {
+    const rows = [];
+    n.text.split('\n').forEach((line) => {
+      const raw = line.trim();
+      if (!raw) return;
+      const norm = raw.replace(/×/g, 'x');
+      const head = norm.match(/^([^\d@]*)/)[1];
+      const name = head.replace(/[\s:,\-–—]+$/, '').trim();
+      const rest = norm.slice(head.length).trim();
+      if (!name && !rest) return;
+      const sets = [];
+      const re = /(\d+(?:\.\d+)?)\s*(?:kg|lbs?|#)?\s*x\s*(\d+(?:\.\d+)?)|@?\s*(\d+(?:\.\d+)?)/g;
+      let m;
+      while ((m = re.exec(rest)) !== null) {
+        if (m[1] !== undefined) sets.push(`${m[1]} for ${m[2]}`);
+        else sets.push(`${m[3]}`);
+      }
+      rows.push({ name: name || raw, sets });
+    });
+    return { id: 'm' + i, date: n.date, rows, ts: n.ts || Date.now() };
+  }).filter((s) => s.rows.length);
+  if (sessions.length) localStorage.setItem(KEY, JSON.stringify(sessions));
 }
 migrate();
 
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
-const persist = () => localStorage.setItem(KEY, JSON.stringify(notes));
+const loadSessions = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
 
-let notes = load();                 // [{id, date:'YYYY-MM-DD', text, ts}]
+let sessions = loadSessions();     // [{id, date:'YYYY-MM-DD', rows:[{name, sets:['135 for 8',...]}], ts}]
 let unit = localStorage.getItem(UNIT_KEY) || 'lb';
-let view = { screen: 'log', noteId: null, exercise: null };  // log | edit | progress | detail
+let view = { screen: 'log', exercise: null };
+let saveTimer = null;
+
+function persist() {
+  const clean = sessions
+    .map((s) => ({ ...s, rows: s.rows
+      .map((r) => ({ name: r.name.trim(), sets: r.sets.map((x) => x.trim()).filter(Boolean) }))
+      .filter((r) => r.name || r.sets.length) }))
+    .filter((s) => s.rows.length);
+  localStorage.setItem(KEY, JSON.stringify(clean));
+}
+const queueSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 300); };
 
 /* ================= helpers ================= */
 const $ = (id) => document.getElementById(id);
@@ -256,261 +234,233 @@ const fmtDay = (iso) => {
 };
 const fmtShort = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-/* ================= the parser =================
-   Turns a free-typed line like
-     "Bench Press 135x8 135x6"      -> weight x reps, one set each
-     "Squat 3x5 @ 185"              -> 3 sets of 5 at 185
-     "Deadlift 225x5x3"             -> 225 for 5 reps, 3 sets
-     "Pull-ups 10, 8, 6"            -> bodyweight, reps only
-     "OHP 95x8 6 5"                 -> 95 for 8, then 6, then 5
-   into { name, sets:[{w,r}], comment } — or a plain note line. */
-const NUM_TOKS = /(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?\s*x\s*(\d+(?:\.\d+)?)(?:\s*x\s*(\d+(?:\.\d+)?))?|@\s*(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?|(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?/gi;
-
-function parseLine(rawLine) {
-  const raw = rawLine.trim();
-  if (!raw) return null;
-  const norm = raw.replace(/×/g, 'x');
-  const head = norm.match(/^([^\d@]*)/)[1];
-  const name = head.replace(/[\s:,\-–—]+$/, '').trim();
-  const rest = norm.slice(head.length);
-  if (!rest.trim()) return { type: 'note', text: raw };
-
-  const sets = [];
-  let atWeight = null;       // "@ 185"
-  let preWeight = null;      // bare number before any pair: "Bench 225 5x5"
-  let mode = null;           // after a pair: 'w' (bares = more reps) | 's' (bare = the weight)
-  let lastSetsGroup = null;  // sets awaiting a weight (sets-mode)
-  let bareReps = [];         // bare numbers with no pair context
-  let lastEnd = 0;
-  NUM_TOKS.lastIndex = 0;
+/* ================= set-line parser =================
+   One set line is what you'd scribble next to an exercise:
+   "135 for 13" · "200lb for 8" · "135x8" · "30 for 6f" · "10, 8, 6" · "12"  */
+function parseSetLine(str) {
+  let t = String(str).toLowerCase().replace(/×/g, 'x').replace(/\bfor\b/g, 'x')
+    .replace(/(kg|lbs?|#)/g, '');
+  const out = [];
+  const re = /(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?(?:\s*[,\s]\s*\d+(?:\.\d+)?)*)|(\d+(?:\.\d+)?)/g;
   let m;
-  while ((m = NUM_TOKS.exec(rest)) !== null) {
-    lastEnd = m.index + m[0].length;
-    if (m[1] !== undefined) {                      // A x B (x C)
-      const a = parseFloat(m[1]), b = parseFloat(m[3]);
-      const aHasUnit = !!m[2];
-      if (m[4] !== undefined) {                    // triple A x B x C
-        const c = parseFloat(m[4]);
-        if (a >= 25 || aHasUnit) for (let i = 0; i < c; i++) sets.push({ w: a, r: b });
-        else for (let i = 0; i < a; i++) sets.push({ w: c, r: b });
-        mode = 'w'; lastSetsGroup = null;
-      } else if (!aHasUnit && a <= 12 && b <= 50 && a === Math.round(a)) {
-        // sets x reps — weight comes from @, a bare number, or bodyweight
-        if (atWeight === null && preWeight === null && bareReps.length === 1) {
-          preWeight = bareReps[0]; bareReps = [];   // "Bench 225 5x5"
-        }
-        const group = [];
-        for (let i = 0; i < a; i++) { const s = { w: atWeight ?? preWeight ?? 0, r: b }; sets.push(s); group.push(s); }
-        lastSetsGroup = (atWeight === null && preWeight === null) ? group : null;
-        mode = 's';
-      } else {                                     // weight x reps
-        sets.push({ w: a, r: b });
-        mode = 'w'; lastSetsGroup = null;
-      }
-    } else if (m[5] !== undefined) {               // @ weight
-      atWeight = parseFloat(m[5]);
-      if (lastSetsGroup) { lastSetsGroup.forEach((s) => s.w = atWeight); lastSetsGroup = null; }
-    } else {                                       // bare number
-      const v = parseFloat(m[7]);
-      const hasUnit = !!m[8];
-      if (mode === 'w' && !hasUnit) {
-        sets.push({ w: sets.length ? sets[sets.length - 1].w : 0, r: v });
-      } else if (mode === 's' || (mode === null && hasUnit)) {
-        if (lastSetsGroup) { lastSetsGroup.forEach((s) => s.w = v); lastSetsGroup = null; }
-        else if (mode === null) preWeight = v;
-      } else if (mode === null) {
-        if (hasUnit) preWeight = v; else bareReps.push(v);
-      }
+  while ((m = re.exec(t)) !== null) {
+    if (m[1] !== undefined) {
+      const w = parseFloat(m[1]);
+      m[2].split(/[\s,]+/).filter(Boolean).forEach((r) => out.push({ w, r: parseFloat(r) }));
+    } else {
+      out.push({ w: 0, r: parseFloat(m[3]) });   // bare number = reps (bodyweight)
     }
   }
-  if (!sets.length && bareReps.length) {
-    // reps-only line: "Pull-ups 10, 8, 6" (or with @/leading weight)
-    bareReps.forEach((r) => sets.push({ w: atWeight ?? preWeight ?? 0, r }));
-  } else if (!sets.length && (atWeight !== null || preWeight !== null)) {
-    sets.push({ w: atWeight ?? preWeight, r: 1 });  // just a weight: one single
-  }
-  if (!sets.length) return { type: 'note', text: raw };
-
-  let comment = rest.slice(lastEnd).replace(/^[\s,.;\-–—)]+/, '').trim();
-  if (/^(kg|lbs?|#|reps?|sets?)$/i.test(comment)) comment = '';
-  if (!name) return { type: 'cont', sets, comment };  // continuation line, attach to previous
-  return { type: 'entry', name, sets: sets.map((s) => ({ w: s.w, r: s.r })), comment };
-}
-
-function parseText(text) {
-  const items = [];
-  for (const line of text.split('\n')) {
-    const p = parseLine(line);
-    if (!p) continue;
-    if (p.type === 'cont') {
-      const prev = [...items].reverse().find((i) => i.type === 'entry');
-      if (prev) { prev.sets.push(...p.sets); if (p.comment) prev.comment = (prev.comment ? prev.comment + ' ' : '') + p.comment; }
-      else items.push({ type: 'note', text: line.trim() });
-    } else items.push(p);
-  }
-  return items;
-}
-
-/* grouped display: consecutive same-weight sets fold together */
-function groupSets(sets) {
-  const gs = [];
-  sets.forEach((s) => {
-    const g = gs[gs.length - 1];
-    if (g && g.w === s.w) g.reps.push(s.r);
-    else gs.push({ w: s.w, reps: [s.r] });
-  });
-  return gs;
-}
-const setsText = (sets) => groupSets(sets)
-  .map((g) => g.w > 0 ? `${g.w}${unit} × ${g.reps.join(', ')}` : `${g.reps.join(', ')} reps`)
-  .join(' &middot; ');
-
-function chipsHTML(sets) {
-  const n = sets.length;
-  const ws = [...new Set(sets.map((s) => s.w).filter((w) => w > 0))];
-  const reps = sets.map((s) => s.r);
-  let out = `<span class="chip">${n} set${n === 1 ? '' : 's'}</span>`;
-  if (ws.length) out += `<span class="chip">${Math.min(...ws) === Math.max(...ws) ? ws[0] : Math.min(...ws) + '–' + Math.max(...ws)} ${unit}</span>`;
-  out += `<span class="chip">${reps.join(' · ')} reps</span>`;
   return out;
 }
 
-/* ================= derived data (for Progress) ================= */
+/* ================= derived data ================= */
 function allEntries() {
-  const out = [];  // {date, name, sets, noteId}
-  notes.forEach((n) => parseText(n.text).forEach((it) => {
-    if (it.type === 'entry') out.push({ date: n.date, name: it.name, sets: it.sets, comment: it.comment, noteId: n.id });
+  const out = [];   // {date, name, sets:[{w,r}], lines:[str]}
+  sessions.forEach((s) => s.rows.forEach((r) => {
+    const name = r.name.trim().replace(/[:\-–—\s]+$/, '');
+    if (!name) return;
+    const lines = r.sets.map((x) => x.trim()).filter(Boolean);
+    const sets = lines.flatMap(parseSetLine);
+    if (sets.length) out.push({ date: s.date, name, sets, lines });
   }));
   return out;
 }
 const topWeight = (e) => Math.max(0, ...e.sets.map((s) => s.w));
 const topReps = (e) => Math.max(0, ...e.sets.map((s) => s.r));
-function exerciseNames(entries) {
-  const seen = new Map();
-  entries.forEach((e) => seen.set(e.name.toLowerCase(), e.name));
-  return [...seen.values()];
+
+const normName = (n) => n.trim().replace(/[:\-–—\s]+$/, '').toLowerCase();
+
+/* last time you did this exercise before `date`: its set lines (the ghosts) */
+function prevSetsFor(name, date) {
+  const key = normName(name);
+  if (!key) return [];
+  let best = null;
+  sessions.forEach((s) => {
+    if (s.date >= date) return;
+    s.rows.forEach((r) => {
+      if (normName(r.name) !== key) return;
+      const lines = r.sets.map((x) => x.trim()).filter(Boolean);
+      if (!lines.length) return;
+      if (!best || s.date > best.date) best = { date: s.date, lines };
+    });
+  });
+  return best ? best.lines : [];
 }
 
 /* ================= rendering ================= */
 const main = $('main');
 
 function render() {
-  const isSub = view.screen === 'detail' || view.screen === 'edit';
-  $('backBtn').style.display = isSub ? 'block' : 'none';
-  $('fab').style.display = view.screen === 'log' ? 'flex' : 'none';
-  $('tabLog').classList.toggle('active', view.screen === 'log' || view.screen === 'edit');
-  $('tabProgress').classList.toggle('active', view.screen === 'progress' || view.screen === 'detail');
+  $('backBtn').style.display = view.screen === 'detail' ? 'block' : 'none';
+  $('tabLog').classList.toggle('active', view.screen === 'log');
+  $('tabProgress').classList.toggle('active', view.screen !== 'log');
   $('unitBtn').textContent = unit;
-
   if (view.screen === 'log') { $('title').textContent = 'Lift Log'; renderLog(); }
-  else if (view.screen === 'edit') { renderEditor(); }
   else if (view.screen === 'progress') { $('title').textContent = 'Progress'; renderProgress(); }
   else { $('title').textContent = view.exercise; renderDetail(view.exercise); }
 }
 
+/* ---------- the open sheet ---------- */
 function renderLog() {
-  if (!notes.length) {
-    main.innerHTML = `<div class="empty"><strong>No workouts yet</strong>
-      Tap + and just type what you did, like<br><code>Bench Press 135x8 135x6</code><br>
-      It picks out the weight, sets and reps for you.</div>`;
-    return;
-  }
-  const sorted = notes.slice().sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : b.ts - a.ts);
-  main.innerHTML = sorted.map((n) => {
-    const items = parseText(n.text);
-    const body = items.length ? items.map((it) =>
-      it.type === 'entry'
-        ? `<div class="note-line"><span class="nm">${esc(it.name)}</span> <span class="st">${setsText(it.sets)}</span></div>`
-        : `<div class="note-line plain">${esc(it.text)}</div>`
-    ).join('') : `<div class="note-line plain">Empty note</div>`;
-    return `<button class="card" data-open="${n.id}">
-      <div class="note-date">${fmtDay(n.date)}</div>${body}</button>`;
-  }).join('');
-}
-
-/* ---- the notes editor: click anywhere, type ---- */
-let editorNote = null;
-let saveTimer = null;
-
-function renderEditor() {
-  editorNote = notes.find((n) => n.id === view.noteId);
-  if (!editorNote) { view = { screen: 'log' }; render(); return; }
-  $('title').textContent = fmtDay(editorNote.date);
-  main.innerHTML = `
-    <label class="date-btn">${fmtShort(editorNote.date)}
-      <input type="date" id="edDate" value="${editorNote.date}">
-    </label>
-    <textarea class="note-input" id="edText" placeholder="Bench Press 135x8 135x6&#10;Squat 3x5 @ 185&#10;Pull-ups 10, 8, 6" autocapitalize="words">${esc(editorNote.text)}</textarea>
-    <div class="parsed" id="parsed"></div>
-    <div class="hint" id="edHint">Type one exercise per line &mdash; weight&times;reps like <code>135x8 135x6</code>, sets&times;reps like <code>3x5 @ 185</code>, or just reps like <code>10, 8, 6</code>. Anything else is kept as a note.</div>
-    <button class="del-note" id="delNote">Delete note</button>`;
-  const ta = $('edText');
-  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.max(140, ta.scrollHeight) + 'px'; };
-  grow();
-  renderParsed();
-  ta.addEventListener('input', () => {
-    grow();
-    editorNote.text = ta.value;
-    editorNote.ts = Date.now();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 250);
-    renderParsed();
-  });
-  $('edDate').addEventListener('change', (e) => {
-    if (!e.target.value) return;
-    editorNote.date = e.target.value;
-    persist();
-    $('title').textContent = fmtDay(editorNote.date);
-    e.target.closest('.date-btn').firstChild.textContent = fmtShort(editorNote.date);
-  });
-  $('delNote').addEventListener('click', () => {
-    if (!confirm('Delete this note?')) return;
-    notes = notes.filter((n) => n.id !== editorNote.id);
-    persist();
-    view = { screen: 'log' };
-    render();
-  });
-  if (!editorNote.text) setTimeout(() => ta.focus(), 150);
-}
-
-function renderParsed() {
-  const items = parseText(editorNote.text);
-  $('parsed').innerHTML = items.map((it) =>
-    it.type === 'entry'
-      ? `<div class="parsed-line"><span class="nm">${esc(it.name)}</span>${chipsHTML(it.sets)}${it.comment ? `<span class="chip dim">${esc(it.comment)}</span>` : ''}</div>`
-      : `<div class="parsed-line plain">${esc(it.text)}</div>`
-  ).join('');
-  $('edHint').style.display = items.some((i) => i.type === 'entry') ? 'none' : 'block';
-}
-
-function openNote(id) {
   clearTimeout(saveTimer);
-  view = { screen: 'edit', noteId: id };
-  render();
-}
-function newNote() {
-  const t = todayStr();
-  let n = notes.find((x) => x.date === t);
-  if (!n) {
-    n = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: t, text: '', ts: Date.now() };
-    notes.push(n);
-    persist();
+  // make sure today exists
+  if (!sessions.some((s) => s.date === todayStr())) {
+    sessions.push({ id: Date.now().toString(36), date: todayStr(), rows: [], ts: Date.now() });
   }
-  openNote(n.id);
-}
-function leaveEditor() {
-  clearTimeout(saveTimer);
-  if (editorNote && !editorNote.text.trim()) notes = notes.filter((n) => n.id !== editorNote.id);
-  persist();
-  editorNote = null;
+  const sorted = sessions.slice().sort((a, b) => b.date < a.date ? -1 : 1);
+  main.innerHTML = '';
+
+  const hasAny = sessions.some((s) => s.rows.some((r) => r.name.trim() || r.sets.some((x) => x.trim())));
+  sorted.forEach((s) => {
+    const day = document.createElement('div');
+    day.className = 'day';
+    day.id = 'day-' + s.date;
+    day.innerHTML = `<div class="day-head">${fmtDay(s.date)}</div>`;
+    // always one blank trailing row to type into
+    const lastRow = s.rows[s.rows.length - 1];
+    if (!lastRow || lastRow.name.trim() || lastRow.sets.some((x) => x.trim())) {
+      s.rows.push({ name: '', sets: [] });
+    }
+    s.rows.forEach((r) => day.appendChild(buildRow(s, r)));
+    main.appendChild(day);
+  });
+
+  if (!hasAny) {
+    const hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.innerHTML = `Type an exercise on the left, hit return, and write the weight on the right &mdash; like <b>135 for 13</b>. Return again for another set. Next workout, last time&rsquo;s numbers show up grayed out so you know what to beat.`;
+    main.querySelector('.day').appendChild(hint);
+  }
 }
 
-/* ---- progress ---- */
+function buildRow(session, row) {
+  const el = document.createElement('div');
+  el.className = 'exrow';
+
+  const nmCol = document.createElement('div');
+  nmCol.className = 'nm-col';
+  const nm = document.createElement('input');
+  nm.type = 'text';
+  nm.value = row.name;
+  nm.placeholder = 'Exercise';
+  nm.autocapitalize = 'words';
+  nm.enterKeyHint = 'next';
+  nmCol.appendChild(nm);
+
+  const setCol = document.createElement('div');
+  setCol.className = 'set-col';
+
+  const ghosts = () => prevSetsFor(row.name, session.date);
+
+  function setInput(i) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.inputMode = 'text';
+    inp.enterKeyHint = 'next';
+    inp.value = row.sets[i] || '';
+    inp.dataset.i = i;
+    inp.addEventListener('input', () => {
+      row.sets[i] = inp.value;
+      session.ts = Date.now();
+      queueSave();
+      ensureTrailingRow();
+    });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (inp.value.trim()) addLine(i + 1);
+      else focusNextRow();
+    });
+    return inp;
+  }
+
+  function renderSets() {
+    setCol.innerHTML = '';
+    const g = ghosts();
+    const count = Math.max(1, row.sets.length, g.length);
+    for (let i = 0; i < count; i++) {
+      const inp = setInput(i);
+      inp.placeholder = g[i] || (i === 0 ? (g.length ? '' : 'weight for reps') : '');
+      setCol.appendChild(inp);
+    }
+    const add = document.createElement('button');
+    add.className = 'addset';
+    add.textContent = '+ set';
+    add.addEventListener('click', () => addLine(setCol.querySelectorAll('input').length));
+    setCol.appendChild(add);
+    refreshAddBtn();
+  }
+
+  function refreshAddBtn() {
+    const inputs = [...setCol.querySelectorAll('input')];
+    const anyTyped = inputs.some((x) => x.value.trim());
+    setCol.querySelector('.addset').style.display = anyTyped ? 'block' : 'none';
+  }
+
+  function addLine(at) {
+    const inputs = [...setCol.querySelectorAll('input')];
+    if (at < inputs.length) { inputs[at].focus(); return; }
+    while (row.sets.length < at) row.sets.push(row.sets.length < inputs.length ? inputs[row.sets.length].value : '');
+    row.sets.push('');
+    renderSets();
+    const all = setCol.querySelectorAll('input');
+    all[all.length - 1].focus();
+  }
+
+  function ensureTrailingRow() {
+    const rows = session.rows;
+    const last = rows[rows.length - 1];
+    if (last && (last.name.trim() || last.sets.some((x) => x && x.trim()))) {
+      const r = { name: '', sets: [] };
+      rows.push(r);
+      el.parentElement.appendChild(buildRow(session, r));
+    }
+    refreshAddBtn();
+  }
+
+  function refreshGhosts() {
+    const g = ghosts();
+    const inputs = [...setCol.querySelectorAll('input')];
+    const count = Math.max(1, row.sets.length, g.length);
+    if (count !== inputs.length) { renderSets(); return; }
+    inputs.forEach((inp, i) => {
+      inp.placeholder = g[i] || (i === 0 && !g.length ? 'weight for reps' : '');
+    });
+  }
+
+  nm.addEventListener('input', () => {
+    row.name = nm.value;
+    session.ts = Date.now();
+    queueSave();
+    refreshGhosts();
+    ensureTrailingRow();
+  });
+  nm.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (nm.value.trim()) setCol.querySelector('input').focus();
+  });
+
+  function focusNextRow() {
+    const next = el.nextElementSibling;
+    if (next && next.classList.contains('exrow')) next.querySelector('.nm-col input').focus();
+  }
+
+  el.appendChild(nmCol);
+  el.appendChild(setCol);
+  renderSets();
+  return el;
+}
+
+/* ---------- progress ---------- */
 function renderProgress() {
   const entries = allEntries();
-  const names = exerciseNames(entries);
+  const seen = new Map();
+  entries.forEach((e) => seen.set(e.name.toLowerCase(), e.name));
+  const names = [...seen.values()];
   if (!names.length) {
-    main.innerHTML = `<div class="empty"><strong>Nothing to chart yet</strong>Write down a workout first, then come back to see your progress per exercise.</div>`;
+    main.innerHTML = `<div class="empty-hint">Write down a workout first &mdash; every exercise you log shows up here with its own progress chart.</div>`;
     return;
   }
   main.innerHTML = names.map((n) => {
@@ -519,15 +469,13 @@ function renderProgress() {
     const bw = list.every((e) => topWeight(e) === 0);
     const best = Math.max(...list.map((e) => bw ? topReps(e) : topWeight(e)));
     return `
-      <button class="card" data-detail="${esc(n)}">
-        <div class="ex-row">
-          <div class="grow">
-            <div class="name">${esc(n)}</div>
-            <div class="meta">${days.length} session${days.length === 1 ? '' : 's'} &middot; last ${fmtShort(days[days.length - 1])}</div>
-          </div>
-          <div class="big">${best}<small> ${bw ? 'reps' : unit}</small></div>
-          <div class="chev">&#8250;</div>
+      <button class="p-row" data-detail="${esc(n)}">
+        <div class="grow">
+          <div class="name">${esc(n)}</div>
+          <div class="meta">${days.length} session${days.length === 1 ? '' : 's'} &middot; last ${fmtShort(days[days.length - 1])}</div>
         </div>
+        <div class="big">${best}<small> ${bw ? 'reps' : unit}</small></div>
+        <div class="chev">&#8250;</div>
       </button>`;
   }).join('');
 }
@@ -549,25 +497,18 @@ function renderDetail(name) {
   const delta = last - points[0].v;
 
   main.innerHTML = `
-    <div class="stats">
-      <div class="stat"><div class="v">${last}<small> ${mUnit}</small></div><div class="k">Last</div></div>
-      <div class="stat"><div class="v">${best}<small> ${mUnit}</small></div><div class="k">Best</div></div>
-      <div class="stat"><div class="v">${delta >= 0 ? '+' : ''}${Math.round(delta * 10) / 10}<small> ${mUnit}</small></div><div class="k">Since start</div></div>
+    <div class="statline">
+      <span>Last <b>${last}</b> ${mUnit}</span>
+      <span>Best <b>${best}</b> ${mUnit}</span>
+      <span>Since start <b>${delta >= 0 ? '+' : ''}${Math.round(delta * 10) / 10}</b> ${mUnit}</span>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Top ${bw ? 'reps' : 'set weight'} over time</div>
-      <div class="chart-wrap" id="chartWrap"></div>
-    </div>
+    <div class="chart-title">Top ${bw ? 'reps' : 'set weight'} over time</div>
+    <div class="chart-wrap" id="chartWrap"></div>
     <div class="section-head">History</div>
     ${entries.slice().reverse().map((e) => `
-      <button class="card" data-open="${e.noteId}">
-        <div class="ex-row">
-          <div class="grow">
-            <div class="note-line" style="margin:0"><span class="st">${setsText(e.sets)}</span></div>
-            ${e.comment ? `<div class="meta">${esc(e.comment)}</div>` : ''}
-          </div>
-          <div class="meta">${fmtShort(e.date)}</div>
-        </div>
+      <button class="h-row" data-day="${e.date}">
+        <div class="grow">${esc(e.lines.join(' · '))}</div>
+        <div class="meta">${fmtShort(e.date)}</div>
       </button>`).join('')}`;
 
   drawChart($('chartWrap'), points, mUnit);
@@ -614,9 +555,9 @@ function drawChart(wrap, points, mUnit) {
     <line x1="${padL}" x2="${W - padR}" y1="${padT + ih}" y2="${padT + ih}" stroke="var(--axis)" stroke-width="1"/>
     ${xLabels.map((p) => `<text x="${p.x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${fmtShort(p.date)}</text>`).join('')}
     <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-    ${px.map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`).join('')}
+    ${px.map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="var(--accent)" stroke="var(--page)" stroke-width="2"/>`).join('')}
     <line id="crossX" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" stroke="var(--axis)" stroke-width="1" style="display:none"/>
-    <circle id="hoverDot" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" style="display:none"/>
+    <circle id="hoverDot" r="5" fill="var(--accent)" stroke="var(--page)" stroke-width="2" style="display:none"/>
   </svg>
   <div class="tip" id="tip"></div>`;
 
@@ -649,25 +590,26 @@ function drawChart(wrap, points, mUnit) {
 }
 
 /* ================= events ================= */
-$('fab').addEventListener('click', newNote);
 main.addEventListener('click', (e) => {
-  const open = e.target.closest('[data-open]');
-  if (open) { openNote(open.dataset.open); return; }
   const det = e.target.closest('[data-detail]');
-  if (det) { view = { screen: 'detail', exercise: det.dataset.detail }; render(); }
+  if (det) { view = { screen: 'detail', exercise: det.dataset.detail }; render(); return; }
+  const day = e.target.closest('[data-day]');
+  if (day) {
+    view = { screen: 'log' };
+    render();
+    const el = $('day-' + day.dataset.day);
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }
 });
-$('tabLog').addEventListener('click', () => { if (view.screen === 'edit') leaveEditor(); view = { screen: 'log' }; render(); });
-$('tabProgress').addEventListener('click', () => { if (view.screen === 'edit') leaveEditor(); view = { screen: 'progress' }; render(); });
-$('backBtn').addEventListener('click', () => {
-  if (view.screen === 'edit') { leaveEditor(); view = { screen: 'log' }; }
-  else view = { screen: 'progress' };
-  render();
-});
+$('tabLog').addEventListener('click', () => { view = { screen: 'log' }; render(); });
+$('tabProgress').addEventListener('click', () => { persist(); view = { screen: 'progress' }; render(); });
+$('backBtn').addEventListener('click', () => { view = { screen: 'progress' }; render(); });
 $('unitBtn').addEventListener('click', () => {
   unit = unit === 'lb' ? 'kg' : 'lb';
   localStorage.setItem(UNIT_KEY, unit);
   render();
 });
+window.addEventListener('pagehide', persist);
 
 render();
 
