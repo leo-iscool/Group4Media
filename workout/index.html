@@ -73,21 +73,28 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
 
 /* ---------- the sheet ---------- */
 .day-head {
-  font-size: 13px; font-weight: 700; color: var(--muted);
+  font-size: 12px; font-weight: 700; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.05em;
-  margin: 28px 0 4px;
+  margin: 20px 0 2px;
 }
-.day:first-child .day-head { margin-top: 8px; }
+.day:first-child .day-head { margin-top: 4px; }
 .exrow { display: flex; align-items: stretch; }
-.nm-col { width: 44%; padding: 10px 12px 10px 0; }
+.nm-col { width: 44%; padding: 5px 12px 5px 0; }
 .nm-col input { font-size: 16px; font-weight: 600; }
-.set-col { flex: 1; border-left: 1px solid var(--axis); padding: 10px 0 10px 14px; }
-.set-col input { font-size: 16px; color: var(--ink-2); display: block; padding: 2px 0; }
+.set-col { flex: 1; border-left: 1px solid var(--axis); padding: 5px 0 5px 14px; }
+.set-col input { font-size: 16px; color: var(--ink-2); display: block; padding: 1px 0; }
 .addset {
-  font-size: 13px; font-weight: 600; color: var(--ghost); padding: 4px 0 0;
-  display: block;
+  font-size: 13px; font-weight: 600; color: var(--ghost); padding: 2px 0 0;
+  display: none;
 }
+.exrow:focus-within .addset { display: block; }
 .addset:active { color: var(--accent); }
+.gap { height: 12px; position: relative; cursor: pointer; }
+.gap::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 5px;
+  border-top: 1px dashed var(--grid); opacity: 0; transition: opacity 0.15s;
+}
+.gap:hover::before, .gap:active::before { opacity: 1; }
 
 /* ---------- progress list ---------- */
 .p-row {
@@ -238,7 +245,8 @@ const fmtShort = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString(undefin
    One set line is what you'd scribble next to an exercise:
    "135 for 13" · "200lb for 8" · "135x8" · "30 for 6f" · "10, 8, 6" · "12"  */
 function parseSetLine(str) {
-  let t = String(str).toLowerCase().replace(/×/g, 'x').replace(/\bfor\b/g, 'x')
+  let t = String(str).toLowerCase().replace(/×/g, 'x')
+    .replace(/\b(for|fir|fur|fro|fot)\b/g, 'x')   // tolerate 'for' typos
     .replace(/(kg|lbs?|#)/g, '');
   const out = [];
   const re = /(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?(?:\s*[,\s]\s*\d+(?:\.\d+)?)*)|(\d+(?:\.\d+)?)/g;
@@ -317,12 +325,10 @@ function renderLog() {
     day.className = 'day';
     day.id = 'day-' + s.date;
     day.innerHTML = `<div class="day-head">${fmtDay(s.date)}</div>`;
-    // always one blank trailing row to type into
-    const lastRow = s.rows[s.rows.length - 1];
-    if (!lastRow || lastRow.name.trim() || lastRow.sets.some((x) => x.trim())) {
-      s.rows.push({ name: '', sets: [] });
-    }
-    s.rows.forEach((r) => day.appendChild(buildRow(s, r)));
+    const cont = document.createElement('div');
+    cont.className = 'rows';
+    day.appendChild(cont);
+    renderDayRows(s, cont);
     main.appendChild(day);
   });
 
@@ -334,7 +340,42 @@ function renderLog() {
   }
 }
 
-function buildRow(session, row) {
+function renderDayRows(session, cont, focusIdx) {
+  cont.innerHTML = '';
+  if (session.date === todayStr()) {
+    // today always ends with a blank row to type into
+    const last = session.rows[session.rows.length - 1];
+    if (!last || last.name.trim() || last.sets.some((x) => x.trim())) {
+      session.rows.push({ name: '', sets: [] });
+    }
+  }
+  session.rows.forEach((r, i) => {
+    if (i > 0) cont.appendChild(buildGap(session, cont));
+    cont.appendChild(buildRow(session, r, cont));
+  });
+  // past days: a tap zone after the last row to append an exercise
+  if (session.rows.length && session.date !== todayStr()) cont.appendChild(buildGap(session, cont));
+  if (focusIdx !== undefined) {
+    const rowEl = cont.querySelectorAll('.exrow')[focusIdx];
+    if (rowEl) rowEl.querySelector('.nm-col input').focus();
+  }
+}
+
+/* the thin space between rows — tap it to slot an exercise in there */
+function buildGap(session, cont) {
+  const g = document.createElement('div');
+  g.className = 'gap';
+  g.addEventListener('click', () => {
+    let idx = 0, el = g.previousElementSibling;
+    while (el) { if (el.classList.contains('exrow')) idx++; el = el.previousElementSibling; }
+    session.rows.splice(idx, 0, { name: '', sets: [] });
+    session.ts = Date.now();
+    renderDayRows(session, cont, idx);
+  });
+  return g;
+}
+
+function buildRow(session, row, cont) {
   const el = document.createElement('div');
   el.className = 'exrow';
 
@@ -361,6 +402,13 @@ function buildRow(session, row) {
     inp.value = row.sets[i] || '';
     inp.dataset.i = i;
     inp.addEventListener('input', () => {
+      // autocorrect 'for' typos once the next character lands: "135 fur 8" -> "135 for 8"
+      const fixed = inp.value.replace(/\b(fir|fur|fro|fot)(?=[\s\d.,])/gi, 'for');
+      if (fixed !== inp.value) {
+        const pos = inp.selectionStart;
+        inp.value = fixed;
+        inp.setSelectionRange(pos, pos);
+      }
       row.sets[i] = inp.value;
       session.ts = Date.now();
       queueSave();
@@ -387,15 +435,12 @@ function buildRow(session, row) {
     const add = document.createElement('button');
     add.className = 'addset';
     add.textContent = '+ set';
-    add.addEventListener('click', () => addLine(setCol.querySelectorAll('input').length));
+    // pointerdown so the tap lands before focus leaves the row (which hides this button)
+    add.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      addLine(setCol.querySelectorAll('input').length);
+    });
     setCol.appendChild(add);
-    refreshAddBtn();
-  }
-
-  function refreshAddBtn() {
-    const inputs = [...setCol.querySelectorAll('input')];
-    const anyTyped = inputs.some((x) => x.value.trim());
-    setCol.querySelector('.addset').style.display = anyTyped ? 'block' : 'none';
   }
 
   function addLine(at) {
@@ -409,14 +454,15 @@ function buildRow(session, row) {
   }
 
   function ensureTrailingRow() {
+    if (session.date !== todayStr()) return;
     const rows = session.rows;
     const last = rows[rows.length - 1];
     if (last && (last.name.trim() || last.sets.some((x) => x && x.trim()))) {
       const r = { name: '', sets: [] };
       rows.push(r);
-      el.parentElement.appendChild(buildRow(session, r));
+      cont.appendChild(buildGap(session, cont));
+      cont.appendChild(buildRow(session, r, cont));
     }
-    refreshAddBtn();
   }
 
   function refreshGhosts() {
@@ -443,8 +489,9 @@ function buildRow(session, row) {
   });
 
   function focusNextRow() {
-    const next = el.nextElementSibling;
-    if (next && next.classList.contains('exrow')) next.querySelector('.nm-col input').focus();
+    let next = el.nextElementSibling;
+    while (next && !next.classList.contains('exrow')) next = next.nextElementSibling;
+    if (next) next.querySelector('.nm-col input').focus();
   }
 
   el.appendChild(nmCol);
