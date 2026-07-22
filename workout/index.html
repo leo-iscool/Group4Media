@@ -129,7 +129,15 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
   color: var(--ink-2); min-height: 13px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; padding: 0 2px;
 }
-.wk.today { background: var(--accent-soft); color: var(--accent); }
+.wk.today { color: var(--accent); }
+.wk.sel { background: var(--accent-soft); }
+.assign { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.assign .lbl { color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
+.ach {
+  font-size: 13px; font-weight: 650; color: var(--ink-2);
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
+}
+.ach.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .plansline {
   display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: center;
   margin-top: 4px; font-size: 13px;
@@ -384,18 +392,53 @@ function render() {
 }
 
 /* ---------- the open sheet ---------- */
-function applyTodaysPlan() {
-  if (mode !== 'advanced') return;
-  const s = sessions.find((x) => x.date === todayStr());
-  const pid = weekMap[new Date().getDay()];
-  if (!s || !pid || s.planApplied === pid) return;
+/* date (YYYY-MM-DD) of a given weekday within the current Mon-Sun week */
+function dateForDow(dow) {
+  const now = new Date();
+  const sinceMon = (now.getDay() + 6) % 7;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMon);
+  const dte = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + ((dow + 6) % 7));
+  return `${dte.getFullYear()}-${String(dte.getMonth() + 1).padStart(2, '0')}-${String(dte.getDate()).padStart(2, '0')}`;
+}
+
+/* put a plan's exercises onto a date's sheet (never touches logged sets) */
+function applyPlanToDate(date, pid) {
+  let s = sessions.find((x) => x.date === date);
   const plan = plans.find((p) => p.id === pid);
-  if (!plan) return;
-  const hasContent = s.rows.some((r) => r.name.trim() || r.sets.some((x) => x && x.trim()));
-  if (hasContent) return;
+  const hasData = s && s.rows.some((r) => r.sets.some((x) => x && x.trim()));
+  if (hasData) return;
+  if (!plan) {
+    if (s && s.planApplied) { s.rows = []; delete s.planApplied; persist(); }
+    return;
+  }
+  if (!s) {
+    s = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), date, rows: [], ts: Date.now() };
+    sessions.push(s);
+  }
+  if (s.rows.some((r) => r.name.trim()) && !s.planApplied) return;  // hand-written rows win
   s.rows = plan.exercises.filter((n) => n.trim()).map((n) => ({ name: n, sets: [] }));
   s.planApplied = pid;
   persist();
+}
+
+function applyTodaysPlan() {
+  if (mode !== 'advanced') return;
+  applyPlanToDate(todayStr(), weekMap[new Date().getDay()]);
+}
+
+/* keep plan-prefilled days in step with their plan until sets get logged,
+   so an exercise added to a split shows up on the sheet too */
+function syncPlannedSessions() {
+  sessions.forEach((s) => {
+    if (!s.planApplied) return;
+    const plan = plans.find((p) => p.id === s.planApplied);
+    if (!plan) return;
+    if (s.rows.some((r) => r.sets.some((x) => x && x.trim()))) return;
+    const names = plan.exercises.filter((n) => n.trim());
+    const lower = names.map((n) => n.toLowerCase());
+    const extras = s.rows.filter((r) => r.name.trim() && !lower.includes(r.name.trim().toLowerCase()));
+    s.rows = [...names.map((n) => ({ name: n, sets: [] })), ...extras];
+  });
 }
 
 function renderLog() {
@@ -405,6 +448,7 @@ function renderLog() {
     sessions.push({ id: Date.now().toString(36), date: todayStr(), rows: [], ts: Date.now() });
   }
   applyTodaysPlan();
+  syncPlannedSessions();
   const sorted = sessions.slice().sort((a, b) => b.date < a.date ? -1 : 1);
   main.innerHTML = '';
 
@@ -442,16 +486,24 @@ function renderLog() {
 /* ---------- advanced: week calendar + plans ---------- */
 const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const DOW_L = { 1: 'M', 2: 'T', 3: 'W', 4: 'T', 5: 'F', 6: 'S', 0: 'S' };
+const DOW_FULL = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 0: 'Sunday' };
+let selDow = new Date().getDay();
 
 function buildAdvStrip() {
   const wrap = document.createElement('div');
   wrap.className = 'adv';
   const todayDow = new Date().getDay();
+  const cur = weekMap[selDow];
   wrap.innerHTML = `
     <div class="week">${DOW_ORDER.map((d) => {
       const p = plans.find((x) => x.id === weekMap[d]);
-      return `<button class="wk ${d === todayDow ? 'today' : ''}" data-dow="${d}">${DOW_L[d]}<span>${p ? esc(p.name || 'Plan') : '–'}</span></button>`;
+      return `<button class="wk ${d === todayDow ? 'today' : ''} ${d === selDow ? 'sel' : ''}" data-dow="${d}">${DOW_L[d]}<span>${p ? esc(p.name || 'Plan') : '–'}</span></button>`;
     }).join('')}</div>
+    <div class="assign">
+      <span class="lbl">${DOW_FULL[selDow]}</span>
+      <button class="ach ${!cur ? 'on' : ''}" data-assign="">Rest</button>
+      ${plans.map((p) => `<button class="ach ${cur === p.id ? 'on' : ''}" data-assign="${p.id}">${esc(p.name || 'Plan')}</button>`).join('')}
+    </div>
     <div class="plansline">
       <span class="lbl">Plans</span>
       ${plans.map((p) => `<button class="pl" data-plan="${p.id}">${esc(p.name || 'Plan')}</button>`).join('')}
@@ -586,8 +638,8 @@ function renderDayRows(session, cont, focusIdx, keepRow) {
   cont.innerHTML = '';
   // drop rows that never got anything written in them
   session.rows = session.rows.filter((r) => r === keepRow || r.name.trim() || r.sets.some((x) => x && x.trim()));
-  if (session.date === todayStr()) {
-    // today always ends with a blank row to type into
+  if (session.date >= todayStr()) {
+    // today and upcoming days always end with a blank row to type into
     const last = session.rows[session.rows.length - 1];
     if (!last || last.name.trim() || last.sets.some((x) => x.trim())) {
       session.rows.push({ name: '', sets: [] });
@@ -598,7 +650,7 @@ function renderDayRows(session, cont, focusIdx, keepRow) {
     cont.appendChild(buildRow(session, r, cont));
   });
   // past days: a tap zone after the last row to append an exercise
-  if (session.rows.length && session.date !== todayStr()) cont.appendChild(buildGap(session, cont));
+  if (session.rows.length && session.date < todayStr()) cont.appendChild(buildGap(session, cont));
   if (focusIdx !== undefined) {
     const rowEl = cont.querySelectorAll('.exrow')[focusIdx];
     if (rowEl) rowEl.querySelector('.nm-col input').focus();
@@ -731,7 +783,7 @@ function buildRow(session, row, cont) {
   }
 
   function ensureTrailingRow() {
-    if (session.date !== todayStr()) return;
+    if (session.date < todayStr()) return;
     const rows = session.rows;
     const last = rows[rows.length - 1];
     if (last && (last.name.trim() || last.sets.some((x) => x && x.trim()))) {
@@ -839,7 +891,7 @@ function buildRow(session, row, cont) {
         row.sets = kept;
         renderSets();
       }
-      const isTodayTrailing = session.date === todayStr() && session.rows[session.rows.length - 1] === row;
+      const isTodayTrailing = session.date >= todayStr() && session.rows[session.rows.length - 1] === row;
       if (!isTodayTrailing && !row.name.trim() && !row.sets.length) {
         const idx = session.rows.indexOf(row);
         if (idx > -1) session.rows.splice(idx, 1);
@@ -1005,13 +1057,26 @@ main.addEventListener('click', (e) => {
   const wk = e.target.closest('[data-dow]');
   if (wk) {
     if (!plans.length) { newPlan(); return; }
-    // tap a weekday to cycle: none -> plan 1 -> plan 2 -> ... -> none
-    const d = wk.dataset.dow;
-    const idx = plans.findIndex((p) => p.id === weekMap[d]);
-    const next = idx === -1 ? plans[0].id : (plans[idx + 1] ? plans[idx + 1].id : undefined);
-    if (next === undefined) delete weekMap[d]; else weekMap[d] = next;
-    persistPlans();
+    // tap a weekday: select it and show that day's sheet
+    selDow = parseInt(wk.dataset.dow, 10);
+    const date = dateForDow(selDow);
+    applyPlanToDate(date, weekMap[selDow]);
     render();
+    const dayEl = $('day-' + date);
+    if (dayEl) dayEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+    return;
+  }
+  const ac = e.target.closest('[data-assign]');
+  if (ac) {
+    // assign a plan (or Rest) to the selected weekday, and reflect it on that day's sheet
+    const pid = ac.dataset.assign || undefined;
+    if (pid) weekMap[selDow] = pid; else delete weekMap[selDow];
+    persistPlans();
+    const date = dateForDow(selDow);
+    applyPlanToDate(date, pid);
+    render();
+    const dayEl = $('day-' + date);
+    if (dayEl) dayEl.scrollIntoView({ block: 'center', behavior: 'instant' });
     return;
   }
   const pl = e.target.closest('[data-plan]');
