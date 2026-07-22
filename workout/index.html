@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Lift Log</title>
-<meta name="description" content="A dead-simple workout notebook that tracks your weight, sets and reps per exercise.">
+<meta name="description" content="A dead-simple workout notebook: just type what you did and it tracks weight, sets and reps per exercise.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -26,7 +26,7 @@
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
   --accent: #2a78d6;
-  --accent-soft: rgba(42, 120, 214, 0.12);
+  --accent-soft: rgba(42, 120, 214, 0.10);
   --danger: #d03b3b;
 }
 @media (prefers-color-scheme: dark) {
@@ -41,7 +41,7 @@
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.10);
     --accent: #3987e5;
-    --accent-soft: rgba(57, 135, 229, 0.18);
+    --accent-soft: rgba(57, 135, 229, 0.16);
     --danger: #e66767;
   }
 }
@@ -54,7 +54,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-input { font: inherit; color: inherit; }
+input, textarea { font: inherit; color: inherit; }
 
 .topbar {
   position: sticky; top: 0; z-index: 5;
@@ -73,28 +73,30 @@ input { font: inherit; color: inherit; }
 
 main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 
-.empty { text-align: center; color: var(--muted); padding: 64px 24px; line-height: 1.6; font-size: 15px; }
+.empty { text-align: center; color: var(--muted); padding: 56px 24px; line-height: 1.6; font-size: 15px; }
 .empty strong { color: var(--ink-2); display: block; font-size: 17px; margin-bottom: 6px; }
-
-.day-head { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 4px 8px; }
-.day-head:first-child { margin-top: 4px; }
+.empty code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 13px; }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px 16px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   width: 100%;
   text-align: left;
   display: block;
 }
-.card .name { font-size: 16px; font-weight: 650; margin-bottom: 4px; }
-.card .sets { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
-.card .note { font-size: 13px; color: var(--muted); margin-top: 4px; font-style: italic; }
+.note-date { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+.note-line { font-size: 15px; line-height: 1.45; margin-bottom: 6px; }
+.note-line:last-child { margin-bottom: 0; }
+.note-line .nm { font-weight: 650; }
+.note-line .st { color: var(--ink-2); }
+.note-line.plain { color: var(--muted); font-style: italic; font-size: 14px; }
 
 .ex-row { display: flex; align-items: center; gap: 12px; }
 .ex-row .grow { flex: 1; min-width: 0; }
+.ex-row .name { font-size: 16px; font-weight: 650; }
 .ex-row .meta { font-size: 13px; color: var(--muted); margin-top: 3px; }
 .ex-row .big { font-size: 17px; font-weight: 700; white-space: nowrap; }
 .ex-row .big small { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -122,6 +124,38 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 .tabbar button.active { color: var(--accent); }
 .tabbar svg { width: 24px; height: 24px; }
 
+/* ---- Editor (the note) ---- */
+.date-btn {
+  display: inline-block; font-size: 13px; font-weight: 650; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 12px; margin-bottom: 12px; position: relative;
+}
+.date-btn input {
+  position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%;
+}
+.note-input {
+  width: 100%; min-height: 140px; resize: none;
+  background: transparent; border: none; outline: none;
+  font-size: 17px; line-height: 1.6; caret-color: var(--accent);
+}
+.note-input::placeholder { color: var(--muted); }
+.parsed { margin-top: 8px; }
+.parsed-line {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  padding: 10px 0; border-top: 1px solid var(--grid);
+}
+.parsed-line .nm { font-size: 15px; font-weight: 650; margin-right: 2px; }
+.parsed-line.plain { color: var(--muted); font-style: italic; font-size: 14px; }
+.chip {
+  font-size: 12px; font-weight: 650; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; padding: 3px 9px;
+  white-space: nowrap;
+}
+.chip.dim { color: var(--muted); background: transparent; border: 1px solid var(--border); font-weight: 600; }
+.hint { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 16px; }
+.hint code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+.del-note { display: block; margin: 28px auto 0; color: var(--danger); font-weight: 650; font-size: 14px; padding: 8px 16px; }
+
 /* ---- Detail view ---- */
 .stats { display: flex; gap: 8px; margin-bottom: 16px; }
 .stat {
@@ -148,39 +182,6 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 }
 .tip .d { font-weight: 500; opacity: 0.75; }
 .section-head { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 4px 8px; }
-
-/* ---- Sheet (add / edit) ---- */
-.scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 9; display: none; }
-.sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  background: var(--surface); border-radius: 18px 18px 0 0;
-  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
-  max-height: 88vh; overflow-y: auto;
-  transform: translateY(105%); transition: transform 0.25s ease;
-  max-width: 560px; margin: 0 auto;
-}
-.sheet.open { transform: translateY(0); }
-.scrim.open { display: block; }
-.sheet h2 { font-size: 18px; margin-bottom: 14px; }
-.field { margin-bottom: 12px; }
-.field label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; }
-.field input {
-  width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--page); font-size: 16px;
-}
-.field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.set-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.set-row .idx { width: 24px; font-size: 13px; font-weight: 700; color: var(--muted); text-align: center; }
-.set-row input { flex: 1; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--page); font-size: 16px; text-align: center; }
-.set-row .x { color: var(--muted); font-size: 13px; }
-.set-row .rm { color: var(--muted); font-size: 20px; padding: 4px 8px; }
-.add-set { color: var(--accent); font-weight: 650; font-size: 15px; padding: 8px 4px; }
-.sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
-.btn-primary {
-  flex: 1; background: var(--accent); color: #fff; font-weight: 700; font-size: 16px;
-  padding: 14px; border-radius: 12px;
-}
-.btn-danger { color: var(--danger); font-weight: 650; font-size: 15px; padding: 14px 16px; }
 .hidden { display: none !important; }
 </style>
 </head>
@@ -194,7 +195,7 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
 
 <main id="main"></main>
 
-<button class="fab" id="fab" aria-label="Add workout">+</button>
+<button class="fab" id="fab" aria-label="New note">+</button>
 
 <nav class="tabbar">
   <button id="tabLog" class="active">
@@ -207,48 +208,38 @@ main { padding: 16px 16px 120px; max-width: 560px; margin: 0 auto; }
   </button>
 </nav>
 
-<div class="scrim" id="scrim"></div>
-<div class="sheet" id="sheet">
-  <h2 id="sheetTitle">New entry</h2>
-  <div class="field">
-    <label for="fName">Exercise</label>
-    <input id="fName" type="text" placeholder="e.g. Bench Press" list="exNames" autocomplete="off" enterkeyhint="next">
-    <datalist id="exNames"></datalist>
-  </div>
-  <div class="field">
-    <label for="fDate">Date</label>
-    <input id="fDate" type="date">
-  </div>
-  <div class="field">
-    <label>Sets &mdash; weight (<span id="setUnitLabel">lb</span>) &times; reps</label>
-    <div id="setRows"></div>
-    <button class="add-set" id="addSetBtn">+ Add set</button>
-  </div>
-  <div class="field">
-    <label for="fNote">Note (optional)</label>
-    <input id="fNote" type="text" placeholder="Felt easy, add weight next time" enterkeyhint="done">
-  </div>
-  <div class="sheet-actions">
-    <button class="btn-danger hidden" id="deleteBtn">Delete</button>
-    <button class="btn-primary" id="saveBtn">Save</button>
-  </div>
-</div>
-
 <script>
 'use strict';
 
-/* ---------------- storage ---------------- */
-const KEY = 'liftlog.entries.v1';
+/* ================= storage ================= */
+const KEY = 'liftlog.notes.v2';
+const OLD_KEY = 'liftlog.entries.v1';
 const UNIT_KEY = 'liftlog.unit';
+
+function migrate() {
+  if (localStorage.getItem(KEY)) return;
+  let old;
+  try { old = JSON.parse(localStorage.getItem(OLD_KEY)); } catch { old = null; }
+  if (!old || !old.length) return;
+  const byDate = {};
+  old.sort((a, b) => a.ts - b.ts).forEach((e) => {
+    const line = `${e.exercise} ` + e.sets.map((s) => s.w > 0 ? `${s.w}x${s.r}` : `${s.r}`).join(' ')
+      + (e.note ? `\n${e.note}` : '');
+    byDate[e.date] = byDate[e.date] ? byDate[e.date] + '\n' + line : line;
+  });
+  const notes = Object.keys(byDate).map((d, i) => ({ id: 'm' + i, date: d, text: byDate[d], ts: Date.now() }));
+  localStorage.setItem(KEY, JSON.stringify(notes));
+}
+migrate();
+
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
-const save = (entries) => localStorage.setItem(KEY, JSON.stringify(entries));
+const persist = () => localStorage.setItem(KEY, JSON.stringify(notes));
 
-let entries = load();               // [{id, date:'YYYY-MM-DD', exercise, sets:[{w,r}], note, ts}]
+let notes = load();                 // [{id, date:'YYYY-MM-DD', text, ts}]
 let unit = localStorage.getItem(UNIT_KEY) || 'lb';
-let view = { screen: 'log', exercise: null };   // 'log' | 'progress' | 'detail'
-let editingId = null;
+let view = { screen: 'log', noteId: null, exercise: null };  // log | edit | progress | detail
 
-/* ---------------- helpers ---------------- */
+/* ================= helpers ================= */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const todayStr = () => {
@@ -261,70 +252,270 @@ const fmtDay = (iso) => {
   const y = new Date(Date.now() - 864e5);
   const yStr = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
   if (iso === yStr) return 'Yesterday';
-  const d = new Date(iso + 'T12:00:00');
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 };
 const fmtShort = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-const num = (v) => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0; };
-const setsText = (sets) =>
-  sets.map((s) => s.w > 0 ? `${s.w}${unit} × ${s.r}` : `${s.r} reps`).join(', ');
 
-// Progress metric per entry: top weight, or top reps if this exercise is bodyweight-only
+/* ================= the parser =================
+   Turns a free-typed line like
+     "Bench Press 135x8 135x6"      -> weight x reps, one set each
+     "Squat 3x5 @ 185"              -> 3 sets of 5 at 185
+     "Deadlift 225x5x3"             -> 225 for 5 reps, 3 sets
+     "Pull-ups 10, 8, 6"            -> bodyweight, reps only
+     "OHP 95x8 6 5"                 -> 95 for 8, then 6, then 5
+   into { name, sets:[{w,r}], comment } — or a plain note line. */
+const NUM_TOKS = /(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?\s*x\s*(\d+(?:\.\d+)?)(?:\s*x\s*(\d+(?:\.\d+)?))?|@\s*(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?|(\d+(?:\.\d+)?)\s*(kg|lbs?|#)?/gi;
+
+function parseLine(rawLine) {
+  const raw = rawLine.trim();
+  if (!raw) return null;
+  const norm = raw.replace(/×/g, 'x');
+  const head = norm.match(/^([^\d@]*)/)[1];
+  const name = head.replace(/[\s:,\-–—]+$/, '').trim();
+  const rest = norm.slice(head.length);
+  if (!rest.trim()) return { type: 'note', text: raw };
+
+  const sets = [];
+  let atWeight = null;       // "@ 185"
+  let preWeight = null;      // bare number before any pair: "Bench 225 5x5"
+  let mode = null;           // after a pair: 'w' (bares = more reps) | 's' (bare = the weight)
+  let lastSetsGroup = null;  // sets awaiting a weight (sets-mode)
+  let bareReps = [];         // bare numbers with no pair context
+  let lastEnd = 0;
+  NUM_TOKS.lastIndex = 0;
+  let m;
+  while ((m = NUM_TOKS.exec(rest)) !== null) {
+    lastEnd = m.index + m[0].length;
+    if (m[1] !== undefined) {                      // A x B (x C)
+      const a = parseFloat(m[1]), b = parseFloat(m[3]);
+      const aHasUnit = !!m[2];
+      if (m[4] !== undefined) {                    // triple A x B x C
+        const c = parseFloat(m[4]);
+        if (a >= 25 || aHasUnit) for (let i = 0; i < c; i++) sets.push({ w: a, r: b });
+        else for (let i = 0; i < a; i++) sets.push({ w: c, r: b });
+        mode = 'w'; lastSetsGroup = null;
+      } else if (!aHasUnit && a <= 12 && b <= 50 && a === Math.round(a)) {
+        // sets x reps — weight comes from @, a bare number, or bodyweight
+        if (atWeight === null && preWeight === null && bareReps.length === 1) {
+          preWeight = bareReps[0]; bareReps = [];   // "Bench 225 5x5"
+        }
+        const group = [];
+        for (let i = 0; i < a; i++) { const s = { w: atWeight ?? preWeight ?? 0, r: b }; sets.push(s); group.push(s); }
+        lastSetsGroup = (atWeight === null && preWeight === null) ? group : null;
+        mode = 's';
+      } else {                                     // weight x reps
+        sets.push({ w: a, r: b });
+        mode = 'w'; lastSetsGroup = null;
+      }
+    } else if (m[5] !== undefined) {               // @ weight
+      atWeight = parseFloat(m[5]);
+      if (lastSetsGroup) { lastSetsGroup.forEach((s) => s.w = atWeight); lastSetsGroup = null; }
+    } else {                                       // bare number
+      const v = parseFloat(m[7]);
+      const hasUnit = !!m[8];
+      if (mode === 'w' && !hasUnit) {
+        sets.push({ w: sets.length ? sets[sets.length - 1].w : 0, r: v });
+      } else if (mode === 's' || (mode === null && hasUnit)) {
+        if (lastSetsGroup) { lastSetsGroup.forEach((s) => s.w = v); lastSetsGroup = null; }
+        else if (mode === null) preWeight = v;
+      } else if (mode === null) {
+        if (hasUnit) preWeight = v; else bareReps.push(v);
+      }
+    }
+  }
+  if (!sets.length && bareReps.length) {
+    // reps-only line: "Pull-ups 10, 8, 6" (or with @/leading weight)
+    bareReps.forEach((r) => sets.push({ w: atWeight ?? preWeight ?? 0, r }));
+  } else if (!sets.length && (atWeight !== null || preWeight !== null)) {
+    sets.push({ w: atWeight ?? preWeight, r: 1 });  // just a weight: one single
+  }
+  if (!sets.length) return { type: 'note', text: raw };
+
+  let comment = rest.slice(lastEnd).replace(/^[\s,.;\-–—)]+/, '').trim();
+  if (/^(kg|lbs?|#|reps?|sets?)$/i.test(comment)) comment = '';
+  if (!name) return { type: 'cont', sets, comment };  // continuation line, attach to previous
+  return { type: 'entry', name, sets: sets.map((s) => ({ w: s.w, r: s.r })), comment };
+}
+
+function parseText(text) {
+  const items = [];
+  for (const line of text.split('\n')) {
+    const p = parseLine(line);
+    if (!p) continue;
+    if (p.type === 'cont') {
+      const prev = [...items].reverse().find((i) => i.type === 'entry');
+      if (prev) { prev.sets.push(...p.sets); if (p.comment) prev.comment = (prev.comment ? prev.comment + ' ' : '') + p.comment; }
+      else items.push({ type: 'note', text: line.trim() });
+    } else items.push(p);
+  }
+  return items;
+}
+
+/* grouped display: consecutive same-weight sets fold together */
+function groupSets(sets) {
+  const gs = [];
+  sets.forEach((s) => {
+    const g = gs[gs.length - 1];
+    if (g && g.w === s.w) g.reps.push(s.r);
+    else gs.push({ w: s.w, reps: [s.r] });
+  });
+  return gs;
+}
+const setsText = (sets) => groupSets(sets)
+  .map((g) => g.w > 0 ? `${g.w}${unit} × ${g.reps.join(', ')}` : `${g.reps.join(', ')} reps`)
+  .join(' &middot; ');
+
+function chipsHTML(sets) {
+  const n = sets.length;
+  const ws = [...new Set(sets.map((s) => s.w).filter((w) => w > 0))];
+  const reps = sets.map((s) => s.r);
+  let out = `<span class="chip">${n} set${n === 1 ? '' : 's'}</span>`;
+  if (ws.length) out += `<span class="chip">${Math.min(...ws) === Math.max(...ws) ? ws[0] : Math.min(...ws) + '–' + Math.max(...ws)} ${unit}</span>`;
+  out += `<span class="chip">${reps.join(' · ')} reps</span>`;
+  return out;
+}
+
+/* ================= derived data (for Progress) ================= */
+function allEntries() {
+  const out = [];  // {date, name, sets, noteId}
+  notes.forEach((n) => parseText(n.text).forEach((it) => {
+    if (it.type === 'entry') out.push({ date: n.date, name: it.name, sets: it.sets, comment: it.comment, noteId: n.id });
+  }));
+  return out;
+}
 const topWeight = (e) => Math.max(0, ...e.sets.map((s) => s.w));
 const topReps = (e) => Math.max(0, ...e.sets.map((s) => s.r));
-
-const exerciseNames = () => {
-  const seen = new Map();  // lowercase -> display name (latest wins)
-  entries.slice().sort((a, b) => a.ts - b.ts).forEach((e) => seen.set(e.exercise.toLowerCase(), e.exercise));
+function exerciseNames(entries) {
+  const seen = new Map();
+  entries.forEach((e) => seen.set(e.name.toLowerCase(), e.name));
   return [...seen.values()];
-};
-const entriesFor = (name) =>
-  entries.filter((e) => e.exercise.toLowerCase() === name.toLowerCase())
-         .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.ts - b.ts);
+}
 
-/* ---------------- rendering ---------------- */
+/* ================= rendering ================= */
 const main = $('main');
 
 function render() {
-  $('backBtn').style.display = view.screen === 'detail' ? 'block' : 'none';
-  $('fab').style.display = view.screen === 'progress' ? 'none' : 'flex';
-  $('tabLog').classList.toggle('active', view.screen === 'log');
-  $('tabProgress').classList.toggle('active', view.screen !== 'log');
+  const isSub = view.screen === 'detail' || view.screen === 'edit';
+  $('backBtn').style.display = isSub ? 'block' : 'none';
+  $('fab').style.display = view.screen === 'log' ? 'flex' : 'none';
+  $('tabLog').classList.toggle('active', view.screen === 'log' || view.screen === 'edit');
+  $('tabProgress').classList.toggle('active', view.screen === 'progress' || view.screen === 'detail');
   $('unitBtn').textContent = unit;
 
   if (view.screen === 'log') { $('title').textContent = 'Lift Log'; renderLog(); }
+  else if (view.screen === 'edit') { renderEditor(); }
   else if (view.screen === 'progress') { $('title').textContent = 'Progress'; renderProgress(); }
   else { $('title').textContent = view.exercise; renderDetail(view.exercise); }
 }
 
 function renderLog() {
-  if (!entries.length) {
-    main.innerHTML = `<div class="empty"><strong>No workouts yet</strong>Tap + to jot down your first exercise &mdash; weight, sets and reps.</div>`;
+  if (!notes.length) {
+    main.innerHTML = `<div class="empty"><strong>No workouts yet</strong>
+      Tap + and just type what you did, like<br><code>Bench Press 135x8 135x6</code><br>
+      It picks out the weight, sets and reps for you.</div>`;
     return;
   }
-  const byDate = {};
-  entries.slice().sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : b.ts - a.ts)
-    .forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
-  main.innerHTML = Object.keys(byDate).map((d) =>
-    `<div class="day-head">${fmtDay(d)}</div>` +
-    byDate[d].map((e) => `
-      <button class="card" data-edit="${e.id}">
-        <div class="name">${esc(e.exercise)}</div>
-        <div class="sets">${esc(setsText(e.sets))}</div>
-        ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
-      </button>`).join('')
-  ).join('');
+  const sorted = notes.slice().sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : b.ts - a.ts);
+  main.innerHTML = sorted.map((n) => {
+    const items = parseText(n.text);
+    const body = items.length ? items.map((it) =>
+      it.type === 'entry'
+        ? `<div class="note-line"><span class="nm">${esc(it.name)}</span> <span class="st">${setsText(it.sets)}</span></div>`
+        : `<div class="note-line plain">${esc(it.text)}</div>`
+    ).join('') : `<div class="note-line plain">Empty note</div>`;
+    return `<button class="card" data-open="${n.id}">
+      <div class="note-date">${fmtDay(n.date)}</div>${body}</button>`;
+  }).join('');
 }
 
+/* ---- the notes editor: click anywhere, type ---- */
+let editorNote = null;
+let saveTimer = null;
+
+function renderEditor() {
+  editorNote = notes.find((n) => n.id === view.noteId);
+  if (!editorNote) { view = { screen: 'log' }; render(); return; }
+  $('title').textContent = fmtDay(editorNote.date);
+  main.innerHTML = `
+    <label class="date-btn">${fmtShort(editorNote.date)}
+      <input type="date" id="edDate" value="${editorNote.date}">
+    </label>
+    <textarea class="note-input" id="edText" placeholder="Bench Press 135x8 135x6&#10;Squat 3x5 @ 185&#10;Pull-ups 10, 8, 6" autocapitalize="words">${esc(editorNote.text)}</textarea>
+    <div class="parsed" id="parsed"></div>
+    <div class="hint" id="edHint">Type one exercise per line &mdash; weight&times;reps like <code>135x8 135x6</code>, sets&times;reps like <code>3x5 @ 185</code>, or just reps like <code>10, 8, 6</code>. Anything else is kept as a note.</div>
+    <button class="del-note" id="delNote">Delete note</button>`;
+  const ta = $('edText');
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.max(140, ta.scrollHeight) + 'px'; };
+  grow();
+  renderParsed();
+  ta.addEventListener('input', () => {
+    grow();
+    editorNote.text = ta.value;
+    editorNote.ts = Date.now();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persist, 250);
+    renderParsed();
+  });
+  $('edDate').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    editorNote.date = e.target.value;
+    persist();
+    $('title').textContent = fmtDay(editorNote.date);
+    e.target.closest('.date-btn').firstChild.textContent = fmtShort(editorNote.date);
+  });
+  $('delNote').addEventListener('click', () => {
+    if (!confirm('Delete this note?')) return;
+    notes = notes.filter((n) => n.id !== editorNote.id);
+    persist();
+    view = { screen: 'log' };
+    render();
+  });
+  if (!editorNote.text) setTimeout(() => ta.focus(), 150);
+}
+
+function renderParsed() {
+  const items = parseText(editorNote.text);
+  $('parsed').innerHTML = items.map((it) =>
+    it.type === 'entry'
+      ? `<div class="parsed-line"><span class="nm">${esc(it.name)}</span>${chipsHTML(it.sets)}${it.comment ? `<span class="chip dim">${esc(it.comment)}</span>` : ''}</div>`
+      : `<div class="parsed-line plain">${esc(it.text)}</div>`
+  ).join('');
+  $('edHint').style.display = items.some((i) => i.type === 'entry') ? 'none' : 'block';
+}
+
+function openNote(id) {
+  clearTimeout(saveTimer);
+  view = { screen: 'edit', noteId: id };
+  render();
+}
+function newNote() {
+  const t = todayStr();
+  let n = notes.find((x) => x.date === t);
+  if (!n) {
+    n = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: t, text: '', ts: Date.now() };
+    notes.push(n);
+    persist();
+  }
+  openNote(n.id);
+}
+function leaveEditor() {
+  clearTimeout(saveTimer);
+  if (editorNote && !editorNote.text.trim()) notes = notes.filter((n) => n.id !== editorNote.id);
+  persist();
+  editorNote = null;
+}
+
+/* ---- progress ---- */
 function renderProgress() {
-  const names = exerciseNames();
+  const entries = allEntries();
+  const names = exerciseNames(entries);
   if (!names.length) {
-    main.innerHTML = `<div class="empty"><strong>Nothing to chart yet</strong>Log a workout first, then come back to see your progress per exercise.</div>`;
+    main.innerHTML = `<div class="empty"><strong>Nothing to chart yet</strong>Write down a workout first, then come back to see your progress per exercise.</div>`;
     return;
   }
   main.innerHTML = names.map((n) => {
-    const list = entriesFor(n);
-    const last = list[list.length - 1];
+    const list = entries.filter((e) => e.name.toLowerCase() === n.toLowerCase());
+    const days = [...new Set(list.map((e) => e.date))].sort();
     const bw = list.every((e) => topWeight(e) === 0);
     const best = Math.max(...list.map((e) => bw ? topReps(e) : topWeight(e)));
     return `
@@ -332,7 +523,7 @@ function renderProgress() {
         <div class="ex-row">
           <div class="grow">
             <div class="name">${esc(n)}</div>
-            <div class="meta">${list.length} session${list.length === 1 ? '' : 's'} &middot; last ${fmtShort(last.date)}</div>
+            <div class="meta">${days.length} session${days.length === 1 ? '' : 's'} &middot; last ${fmtShort(days[days.length - 1])}</div>
           </div>
           <div class="big">${best}<small> ${bw ? 'reps' : unit}</small></div>
           <div class="chev">&#8250;</div>
@@ -342,21 +533,20 @@ function renderProgress() {
 }
 
 function renderDetail(name) {
-  const list = entriesFor(name);
-  if (!list.length) { view = { screen: 'progress', exercise: null }; render(); return; }
-  const bw = list.every((e) => topWeight(e) === 0);
+  const entries = allEntries().filter((e) => e.name.toLowerCase() === name.toLowerCase());
+  if (!entries.length) { view = { screen: 'progress' }; render(); return; }
+  entries.sort((a, b) => a.date < b.date ? -1 : 1);
+  const bw = entries.every((e) => topWeight(e) === 0);
   const metric = (e) => bw ? topReps(e) : topWeight(e);
   const mUnit = bw ? 'reps' : unit;
 
-  // one point per day (best of day)
   const byDay = {};
-  list.forEach((e) => { byDay[e.date] = Math.max(byDay[e.date] || 0, metric(e)); });
+  entries.forEach((e) => { byDay[e.date] = Math.max(byDay[e.date] || 0, metric(e)); });
   const points = Object.keys(byDay).sort().map((d) => ({ date: d, v: byDay[d] }));
 
   const best = Math.max(...points.map((p) => p.v));
   const last = points[points.length - 1].v;
-  const first = points[0].v;
-  const delta = last - first;
+  const delta = last - points[0].v;
 
   main.innerHTML = `
     <div class="stats">
@@ -369,12 +559,12 @@ function renderDetail(name) {
       <div class="chart-wrap" id="chartWrap"></div>
     </div>
     <div class="section-head">History</div>
-    ${list.slice().reverse().map((e) => `
-      <button class="card" data-edit="${e.id}">
+    ${entries.slice().reverse().map((e) => `
+      <button class="card" data-open="${e.noteId}">
         <div class="ex-row">
           <div class="grow">
-            <div class="sets">${esc(setsText(e.sets))}</div>
-            ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+            <div class="note-line" style="margin:0"><span class="st">${setsText(e.sets)}</span></div>
+            ${e.comment ? `<div class="meta">${esc(e.comment)}</div>` : ''}
           </div>
           <div class="meta">${fmtShort(e.date)}</div>
         </div>
@@ -383,12 +573,12 @@ function renderDetail(name) {
   drawChart($('chartWrap'), points, mUnit);
 }
 
-/* ---------------- line chart (SVG) ---------------- */
+/* ================= line chart (SVG) ================= */
 function drawChart(wrap, points, mUnit) {
   const W = 520, H = 240, padL = 40, padR = 14, padT = 12, padB = 28;
   const iw = W - padL - padR, ih = H - padT - padB;
 
-  if (points.length === 1) points = [points[0], points[0]]; // still draw a flat hint
+  if (points.length === 1) points = [points[0], points[0]];
 
   const xs = points.map((p) => new Date(p.date + 'T12:00:00').getTime());
   const minX = Math.min(...xs), maxX = Math.max(...xs) || minX + 1;
@@ -397,10 +587,9 @@ function drawChart(wrap, points, mUnit) {
   let minV = Math.min(...points.map((p) => p.v));
   let maxV = Math.max(...points.map((p) => p.v));
   if (minV === maxV) { minV -= 1; maxV += 1; }
-  const pad = (maxV - minV) * 0.15;
-  minV = Math.max(0, minV - pad); maxV += pad;
+  const vpad = (maxV - minV) * 0.15;
+  minV = Math.max(0, minV - vpad); maxV += vpad;
 
-  // nice y ticks (4)
   const rawStep = (maxV - minV) / 3;
   const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= rawStep) || rawStep;
@@ -414,7 +603,6 @@ function drawChart(wrap, points, mUnit) {
   const px = points.map((p, i) => ({ x: X(xs[i]), y: Y(p.v), ...p }));
   const path = px.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 
-  // x labels: first, last, and a middle one if room
   const xLabels = [px[0], px[px.length - 1]];
   if (px.length > 4) xLabels.splice(1, 0, px[Math.floor(px.length / 2)]);
 
@@ -432,7 +620,6 @@ function drawChart(wrap, points, mUnit) {
   </svg>
   <div class="tip" id="tip"></div>`;
 
-  // crosshair + tooltip
   const svg = wrap.querySelector('svg');
   const tip = wrap.querySelector('#tip');
   const crossX = wrap.querySelector('#crossX');
@@ -461,100 +648,24 @@ function drawChart(wrap, points, mUnit) {
   svg.addEventListener('pointerleave', hide);
 }
 
-/* ---------------- sheet (add / edit) ---------------- */
-const sheet = $('sheet'), scrim = $('scrim'), setRows = $('setRows');
-
-function setRowHTML(w, r, i) {
-  return `<div class="set-row">
-    <span class="idx">${i + 1}</span>
-    <input type="number" inputmode="decimal" step="any" min="0" placeholder="weight" class="in-w" value="${w !== '' ? w : ''}">
-    <span class="x">&times;</span>
-    <input type="number" inputmode="numeric" min="0" placeholder="reps" class="in-r" value="${r !== '' ? r : ''}">
-    <button class="rm" data-rm aria-label="Remove set">&#10005;</button>
-  </div>`;
-}
-function reindexRows() {
-  [...setRows.querySelectorAll('.set-row .idx')].forEach((el, i) => el.textContent = i + 1);
-}
-function addSetRow(w = '', r = '') {
-  setRows.insertAdjacentHTML('beforeend', setRowHTML(w, r, setRows.children.length));
-}
-
-function openSheet(entry) {
-  editingId = entry ? entry.id : null;
-  $('sheetTitle').textContent = entry ? 'Edit entry' : 'New entry';
-  $('deleteBtn').classList.toggle('hidden', !entry);
-  $('fName').value = entry ? entry.exercise : (view.screen === 'detail' ? view.exercise : '');
-  $('fDate').value = entry ? entry.date : todayStr();
-  $('fNote').value = entry ? (entry.note || '') : '';
-  $('setUnitLabel').textContent = unit;
-  setRows.innerHTML = '';
-  if (entry) entry.sets.forEach((s) => addSetRow(s.w || '', s.r || ''));
-  else addSetRow();
-  $('exNames').innerHTML = exerciseNames().map((n) => `<option value="${esc(n)}">`).join('');
-  scrim.classList.add('open'); sheet.classList.add('open');
-  if (!entry && !$('fName').value) setTimeout(() => $('fName').focus(), 250);
-}
-function closeSheet() { scrim.classList.remove('open'); sheet.classList.remove('open'); editingId = null; }
-
-function saveSheet() {
-  const name = $('fName').value.trim();
-  if (!name) { $('fName').focus(); return; }
-  const sets = [...setRows.querySelectorAll('.set-row')].map((row) => ({
-    w: num(row.querySelector('.in-w').value),
-    r: Math.round(num(row.querySelector('.in-r').value))
-  })).filter((s) => s.w > 0 || s.r > 0);
-  if (!sets.length) { setRows.querySelector('.in-w')?.focus(); return; }
-  const date = $('fDate').value || todayStr();
-  const note = $('fNote').value.trim();
-
-  if (editingId) {
-    const e = entries.find((x) => x.id === editingId);
-    if (e) Object.assign(e, { exercise: name, date, sets, note });
-  } else {
-    entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), exercise: name, date, sets, note, ts: Date.now() });
-  }
-  save(entries);
-  closeSheet();
-  render();
-}
-
-/* ---------------- events ---------------- */
-$('fab').addEventListener('click', () => openSheet(null));
-$('addSetBtn').addEventListener('click', () => {
-  const rows = setRows.querySelectorAll('.set-row');
-  const lastRow = rows[rows.length - 1];
-  addSetRow(lastRow ? lastRow.querySelector('.in-w').value : '', lastRow ? lastRow.querySelector('.in-r').value : '');
-});
-setRows.addEventListener('click', (e) => {
-  const rm = e.target.closest('[data-rm]');
-  if (rm) { rm.closest('.set-row').remove(); if (!setRows.children.length) addSetRow(); reindexRows(); }
-});
-$('saveBtn').addEventListener('click', saveSheet);
-$('deleteBtn').addEventListener('click', () => {
-  if (!editingId) return;
-  if (!confirm('Delete this entry?')) return;
-  entries = entries.filter((x) => x.id !== editingId);
-  save(entries);
-  closeSheet();
-  if (view.screen === 'detail' && !entriesFor(view.exercise).length) view = { screen: 'progress', exercise: null };
-  render();
-});
-scrim.addEventListener('click', closeSheet);
-
+/* ================= events ================= */
+$('fab').addEventListener('click', newNote);
 main.addEventListener('click', (e) => {
-  const edit = e.target.closest('[data-edit]');
-  if (edit) { openSheet(entries.find((x) => x.id === edit.dataset.edit)); return; }
+  const open = e.target.closest('[data-open]');
+  if (open) { openNote(open.dataset.open); return; }
   const det = e.target.closest('[data-detail]');
   if (det) { view = { screen: 'detail', exercise: det.dataset.detail }; render(); }
 });
-$('tabLog').addEventListener('click', () => { view = { screen: 'log', exercise: null }; render(); });
-$('tabProgress').addEventListener('click', () => { view = { screen: 'progress', exercise: null }; render(); });
-$('backBtn').addEventListener('click', () => { view = { screen: 'progress', exercise: null }; render(); });
+$('tabLog').addEventListener('click', () => { if (view.screen === 'edit') leaveEditor(); view = { screen: 'log' }; render(); });
+$('tabProgress').addEventListener('click', () => { if (view.screen === 'edit') leaveEditor(); view = { screen: 'progress' }; render(); });
+$('backBtn').addEventListener('click', () => {
+  if (view.screen === 'edit') { leaveEditor(); view = { screen: 'log' }; }
+  else view = { screen: 'progress' };
+  render();
+});
 $('unitBtn').addEventListener('click', () => {
   unit = unit === 'lb' ? 'kg' : 'lb';
   localStorage.setItem(UNIT_KEY, unit);
-  $('setUnitLabel').textContent = unit;
   render();
 });
 
