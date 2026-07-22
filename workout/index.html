@@ -138,6 +138,7 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
   border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
 }
 .ach.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.wkpreview { font-size: 13px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
 .plansline {
   display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: center;
   margin-top: 4px; font-size: 13px;
@@ -449,7 +450,12 @@ function renderLog() {
   }
   applyTodaysPlan();
   syncPlannedSessions();
-  const sorted = sessions.slice().sort((a, b) => b.date < a.date ? -1 : 1);
+  // future days never live in the notes: drop leftover plan previews, and
+  // keep any future day with real logged sets hidden until its date arrives
+  const before = sessions.length;
+  sessions = sessions.filter((s) => s.date <= todayStr() || s.rows.some((r) => r.sets.some((x) => x && x.trim())));
+  if (sessions.length !== before) persist();
+  const sorted = sessions.filter((s) => s.date <= todayStr()).sort((a, b) => b.date < a.date ? -1 : 1);
   main.innerHTML = '';
 
   // basic / advanced switch
@@ -494,6 +500,8 @@ function buildAdvStrip() {
   wrap.className = 'adv';
   const todayDow = new Date().getDay();
   const cur = weekMap[selDow];
+  const curPlan = plans.find((p) => p.id === cur);
+  const selIsToday = dateForDow(selDow) === todayStr();
   wrap.innerHTML = `
     <div class="week">${DOW_ORDER.map((d) => {
       const p = plans.find((x) => x.id === weekMap[d]);
@@ -504,6 +512,7 @@ function buildAdvStrip() {
       <button class="ach ${!cur ? 'on' : ''}" data-assign="">Rest</button>
       ${plans.map((p) => `<button class="ach ${cur === p.id ? 'on' : ''}" data-assign="${p.id}">${esc(p.name || 'Plan')}</button>`).join('')}
     </div>
+    ${!selIsToday && curPlan ? `<div class="wkpreview">${esc(curPlan.exercises.filter((n) => n.trim()).join(' · ') || 'No exercises yet')}</div>` : ''}
     <div class="plansline">
       <span class="lbl">Plans</span>
       ${plans.map((p) => `<button class="pl" data-plan="${p.id}">${esc(p.name || 'Plan')}</button>`).join('')}
@@ -1057,26 +1066,22 @@ main.addEventListener('click', (e) => {
   const wk = e.target.closest('[data-dow]');
   if (wk) {
     if (!plans.length) { newPlan(); return; }
-    // tap a weekday: select it and show that day's sheet
+    // tap a weekday: select it — today's plan goes on the sheet, other days just preview
     selDow = parseInt(wk.dataset.dow, 10);
     const date = dateForDow(selDow);
-    applyPlanToDate(date, weekMap[selDow]);
+    if (date === todayStr()) applyPlanToDate(date, weekMap[selDow]);
     render();
-    const dayEl = $('day-' + date);
-    if (dayEl) dayEl.scrollIntoView({ block: 'center', behavior: 'instant' });
     return;
   }
   const ac = e.target.closest('[data-assign]');
   if (ac) {
-    // assign a plan (or Rest) to the selected weekday, and reflect it on that day's sheet
+    // assign a plan (or Rest) to the selected weekday
     const pid = ac.dataset.assign || undefined;
     if (pid) weekMap[selDow] = pid; else delete weekMap[selDow];
     persistPlans();
     const date = dateForDow(selDow);
-    applyPlanToDate(date, pid);
+    if (date === todayStr()) applyPlanToDate(date, pid);
     render();
-    const dayEl = $('day-' + date);
-    if (dayEl) dayEl.scrollIntoView({ block: 'center', behavior: 'instant' });
     return;
   }
   const pl = e.target.closest('[data-plan]');
