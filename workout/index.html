@@ -249,18 +249,23 @@ main { padding: 8px 20px 140px; max-width: 560px; margin: 0 auto; }
   background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
   border-radius: 50%; display: flex; align-items: center; justify-content: center;
 }
-.cmp {
-  position: fixed; inset: 0; background: var(--page); z-index: 20;
-  padding: calc(16px + env(safe-area-inset-top)) 16px 24px; overflow-y: auto;
+.cmpf { position: fixed; inset: 0; background: #000; z-index: 30; }
+.cmpf > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cmpf-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 36px;
+  background: linear-gradient(rgba(0, 0, 0, 0.72), transparent);
+  color: #fff; display: flex; align-items: flex-start;
 }
-.cmp-head { display: flex; align-items: baseline; margin-bottom: 4px; }
-.cmp-days { flex: 1; font-size: 22px; font-weight: 800; }
-.cmp-close { color: var(--accent); font-weight: 700; font-size: 15px; padding: 4px 0 4px 12px; }
-.cmp-sub { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-.cmp-imgs { display: flex; gap: 8px; }
-.cmp-imgs figure { flex: 1; min-width: 0; margin: 0; }
-.cmp-imgs img { width: 100%; border-radius: 10px; display: block; }
-.cmp-imgs figcaption { font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px; }
+.cmpf-top > div:first-child { flex: 1; min-width: 0; }
+.cmpf-days { font-size: 20px; font-weight: 800; }
+.cmpf-cap { font-size: 13px; opacity: 0.85; margin-top: 3px; font-weight: 600; }
+.cmpf-close { color: #fff; font-weight: 700; font-size: 15px; padding: 4px 0 4px 14px; }
+.cmpf-hint {
+  position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom));
+  text-align: center; color: rgba(255, 255, 255, 0.75);
+  font-size: 13px; font-weight: 600; z-index: 2; pointer-events: none;
+}
 
 /* ---------- tabbar ---------- */
 .tabbar {
@@ -1109,6 +1114,12 @@ async function shrinkImage(file) {
     return await new Promise((res) => c.toBlob((b) => res(b || file), 'image/jpeg', 0.85));
   } catch { return file; }
 }
+/* photos are stored as raw bytes — Safari can invalidate Blobs kept in
+   IndexedDB, which is what turned saved pics into broken images */
+function recBlob(rec) {
+  if (rec.buf) return new Blob([rec.buf], { type: rec.type || 'image/jpeg' });
+  return rec.blob;
+}
 
 let picSel = [];          // up to 2 selected photo ids
 let compareOpen = false;
@@ -1139,7 +1150,8 @@ async function renderPics() {
     const bar = document.createElement('div');
     bar.className = 'picbar';
     bar.innerHTML = `
-      ${picSel.length === 2 ? `<button data-cmp>Compare</button>` : `<span class="dim">Pick ${2 - picSel.length} more to compare</span>`}
+      <button data-cmp>${picSel.length === 2 ? 'Compare' : 'View'}</button>
+      ${picSel.length === 1 ? `<span class="dim">pick another to compare</span>` : ''}
       <button class="del" data-pdel>Delete</button>
       <button class="dim" data-pclear>Clear</button>`;
     bar.querySelector('[data-cmp]')?.addEventListener('click', () => { compareOpen = true; renderPics(); });
@@ -1161,7 +1173,7 @@ async function renderPics() {
     const grid = document.createElement('div');
     grid.className = 'pgrid';
     photos.forEach((p) => {
-      const url = URL.createObjectURL(p.blob);
+      const url = URL.createObjectURL(recBlob(p));
       picUrls.push(url);
       const cell = document.createElement('div');
       cell.className = 'pcell' + (picSel.includes(p.id) ? ' sel' : '');
@@ -1178,24 +1190,38 @@ async function renderPics() {
     main.appendChild(grid);
   }
 
-  if (compareOpen && picSel.length === 2) {
+  if (compareOpen && picSel.length >= 1) {
+    // full-screen viewer: one photo fills the screen, tap anywhere to flip
     const pair = picSel.map((id) => photos.find((p) => p.id === id)).sort((a, b) => a.ts - b.ts);
-    const days = Math.round((new Date(pair[1].date + 'T12:00:00') - new Date(pair[0].date + 'T12:00:00')) / 864e5);
-    const u1 = URL.createObjectURL(pair[0].blob), u2 = URL.createObjectURL(pair[1].blob);
-    picUrls.push(u1, u2);
+    const days = pair.length === 2
+      ? Math.round((new Date(pair[1].date + 'T12:00:00') - new Date(pair[0].date + 'T12:00:00')) / 864e5)
+      : 0;
+    const urls = pair.map((p) => { const u = URL.createObjectURL(recBlob(p)); picUrls.push(u); return u; });
+    let idx = 0;
     const cmp = document.createElement('div');
-    cmp.className = 'cmp';
+    cmp.className = 'cmpf';
     cmp.innerHTML = `
-      <div class="cmp-head">
-        <div class="cmp-days">${days === 0 ? 'Same day' : days + ' day progress'}</div>
-        <button class="cmp-close">Close</button>
+      <img id="cmpImg" alt="Progress photo">
+      <div class="cmpf-top">
+        <div>
+          <div class="cmpf-days">${pair.length === 2 ? (days === 0 ? 'Same day' : days + ' day progress') : 'Progress pic'}</div>
+          <div class="cmpf-cap" id="cmpCap"></div>
+        </div>
+        <button class="cmpf-close">Close</button>
       </div>
-      <div class="cmp-sub">${fmtShort(pair[0].date)} &rarr; ${fmtShort(pair[1].date)}</div>
-      <div class="cmp-imgs">
-        <figure><img src="${u1}" alt="Before"><figcaption>${fmtShort(pair[0].date)}</figcaption></figure>
-        <figure><img src="${u2}" alt="After"><figcaption>${fmtShort(pair[1].date)}</figcaption></figure>
-      </div>`;
-    cmp.querySelector('.cmp-close').addEventListener('click', () => { compareOpen = false; renderPics(); });
+      ${pair.length > 1 ? '<div class="cmpf-hint">Tap to switch photo</div>' : ''}`;
+    const imgEl = cmp.querySelector('#cmpImg');
+    const capEl = cmp.querySelector('#cmpCap');
+    const show = () => {
+      imgEl.src = urls[idx];
+      const tag = pair.length === 2 ? (idx === 0 ? 'Before · ' : 'After · ') : '';
+      capEl.textContent = `${tag}${fmtShort(pair[idx].date)}${pair.length > 1 ? ` · ${idx + 1}/${pair.length}` : ''}`;
+    };
+    show();
+    cmp.addEventListener('click', (e) => {
+      if (e.target.closest('.cmpf-close')) { compareOpen = false; renderPics(); return; }
+      if (pair.length > 1) { idx = (idx + 1) % pair.length; show(); }
+    });
     main.appendChild(cmp);
   } else {
     compareOpen = false;
@@ -1211,7 +1237,8 @@ $('picFile').addEventListener('change', async (e) => {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
     ts: Date.now(),
     date: todayStr(),
-    blob
+    buf: await blob.arrayBuffer(),
+    type: blob.type || 'image/jpeg'
   });
   if (view.screen === 'pics') renderPics();
 });
